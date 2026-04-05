@@ -24,6 +24,7 @@ ADDITIONAL_COLUMNS = {
         "delivery_content": "TEXT",
     },
     "order_items": {
+        "stock_status": "VARCHAR(32)",
         "delivery_content": "TEXT",
     },
     "payment_events": {
@@ -87,3 +88,5 @@ async def _apply_postgres_migrations(connection) -> None:
 async def _list_sqlite_columns(connection, table_name: str) -> set[str]:
     result = await connection.exec_driver_sql(f"PRAGMA table_info({table_name})")
     return {row[1] for row in result.fetchall()}
+
+

@@ -4,6 +4,7 @@ from html import escape
 
 from aiogram import Bot
 
+
 from bot.db.repositories import DeliveryFileRepository, OrderRepository
 
 
@@ -14,12 +15,18 @@ async def deliver_order_digital_content(*, bot: Bot, session_maker, order_id: in
     if not order or order.delivery_sent_at:
         return False
 
-    required_by_product: dict[int, int] = {}
+    auto_required_by_product: dict[int, int] = {}
     product_titles: dict[int, str] = {}
     text_items = []
+    preorder_items = []
+
     for item in order.items:
+        if item.stock_status == "preorder":
+            preorder_items.append(item)
+            continue
+
         if item.product_id:
-            required_by_product[item.product_id] = required_by_product.get(item.product_id, 0) + item.quantity
+            auto_required_by_product[item.product_id] = auto_required_by_product.get(item.product_id, 0) + item.quantity
             product_titles[item.product_id] = item.title
         if item.delivery_content:
             text_items.append(item)
@@ -32,7 +39,7 @@ async def deliver_order_digital_content(*, bot: Bot, session_maker, order_id: in
     for file in reserved_files:
         reserved_count_by_product[file.product_id] = reserved_count_by_product.get(file.product_id, 0) + 1
 
-    for product_id, required_count in required_by_product.items():
+    for product_id, required_count in auto_required_by_product.items():
         missing_count = required_count - reserved_count_by_product.get(product_id, 0)
         if missing_count <= 0:
             continue
@@ -74,13 +81,14 @@ async def deliver_order_digital_content(*, bot: Bot, session_maker, order_id: in
         reserved_files.extend(new_files)
 
     pending_files = [file for file in reserved_files if file.delivered_at is None]
-    if not pending_files and not text_items:
-        return False
+    delivered_anything = False
 
-    await bot.send_message(
-        order.user_id,
-        f"<b>Ваш заказ #{order.id} оплачен.</b>\n\nНиже ZIP-файлы по вашему заказу.",
-    )
+    if pending_files:
+        await bot.send_message(
+            order.user_id,
+            f"<b>Ваш заказ #{order.id} оплачен.</b>\n\nНиже ZIP-файлы по вашему заказу.",
+        )
+        delivered_anything = True
 
     for file in pending_files:
         caption = f"Заказ #{order.id}"
@@ -90,14 +98,42 @@ async def deliver_order_digital_content(*, bot: Bot, session_maker, order_id: in
         async with session_maker() as session:
             await DeliveryFileRepository(session).mark_delivered([file.id])
 
+    if text_items:
+        delivered_anything = True
     for item in text_items:
         await bot.send_message(
             order.user_id,
             f"<b>{escape(item.title)}</b>\n\n{escape(item.delivery_content or '')}",
         )
 
+    if preorder_items:
+        preorder_titles = ", ".join(escape(item.title) for item in preorder_items)
+        user_text = (
+            f"<b>Заказ #{order.id} оплачен.</b>\n\n"
+            f"Позиции <b>{preorder_titles}</b> оформлены как <b>под заказ</b>. "
+            "По ним выдача будет выполнена админом вручную."
+        )
+        admin_text = (
+            f"<b>В заказе #{order.id} есть товары под заказ</b>\n\n"
+            f"Покупатель: <b>{escape(order.customer_name)}</b>\n"
+            f"Позиции: <b>{preorder_titles}</b>\n"
+            "Автовыдача для них отключена, нужна ручная обработка."
+        )
+        try:
+            await bot.send_message(order.user_id, user_text)
+        except Exception:
+            pass
+        if admin_id:
+            try:
+                await bot.send_message(admin_id, admin_text)
+            except Exception:
+                pass
+        delivered_anything = True
+
+    if not delivered_anything:
+        return False
+
     async with session_maker() as session:
         updated_order = await OrderRepository(session).mark_delivery_sent(order_id)
 
     return updated_order is not None
-

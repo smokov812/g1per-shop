@@ -341,6 +341,7 @@ class OrderRepository:
                     sku=item.product.sku,
                     price=item.product.price,
                     quantity=item.quantity,
+                    stock_status=item.product.stock_status,
                     delivery_content=item.product.delivery_content,
                 )
             )
@@ -767,5 +768,9 @@ def _parse_order_id(value) -> int | None:
     if raw and raw.isdigit():
         return int(raw)
     return None
+
+
+
+
 
 
