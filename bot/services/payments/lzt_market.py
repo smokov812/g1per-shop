@@ -38,7 +38,7 @@ class LztMarketPaymentService(BasePaymentService):
             "url_success": self.config.lzt_market_success_url or None,
             "url_callback": self.config.lzt_market_webhook_url or None,
             "merchant_id": self._merchant_id_value(),
-            "lifetime": self.config.lzt_market_lifetime_minutes,
+            "lifetime": self.config.lzt_market_lifetime_minutes * 60,
         }
         payload = {key: value for key, value in payload.items() if value not in (None, "")}
 
@@ -148,3 +148,4 @@ class LztMarketPaymentService(BasePaymentService):
         if value in (None, ""):
             return None
         return str(value)
+
