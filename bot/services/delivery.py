@@ -7,6 +7,32 @@ from aiogram import Bot
 from bot.db.repositories import DeliveryFileRepository, OrderRepository
 
 
+def _normalize_manager_username(manager_username: str | None) -> str:
+    value = (manager_username or "").strip()
+    if value and not value.startswith("@"):
+        value = f"@{value}"
+    return value
+
+
+def _render_delivery_template(template: str | None, *, order, item, manager_username: str | None) -> str:
+    if not template:
+        return ""
+
+    username = f"@{order.username}" if order.username else f"id:{order.user_id}"
+    values = {
+        "{order_id}": str(order.id),
+        "{username}": username,
+        "{user_id}": str(order.user_id),
+        "{manager_username}": _normalize_manager_username(manager_username),
+        "{product_title}": item.title,
+    }
+
+    rendered = template
+    for placeholder, value in values.items():
+        rendered = rendered.replace(placeholder, value)
+    return rendered
+
+
 async def deliver_order_digital_content(
     *,
     bot: Bot,
@@ -105,26 +131,26 @@ async def deliver_order_digital_content(
     if text_items:
         delivery_completed = True
     for item in text_items:
+        rendered_text = _render_delivery_template(item.delivery_content, order=order, item=item, manager_username=manager_username)
         await bot.send_message(
             order.user_id,
-            f"<b>{escape(item.title)}</b>\n\n{escape(item.delivery_content or '')}",
+            f"<b>{escape(item.title)}</b>\n\n{escape(rendered_text)}",
         )
 
-    normalized_manager = (manager_username or "").strip()
-    if normalized_manager and not normalized_manager.startswith("@"):
-        normalized_manager = f"@{normalized_manager}"
+    normalized_manager = _normalize_manager_username(manager_username)
 
     preorder_instruction_sent = False
     if preorder_items and normalized_manager:
         for item in preorder_items:
             if not item.delivery_content:
                 continue
+            rendered_template = _render_delivery_template(item.delivery_content, order=order, item=item, manager_username=normalized_manager)
             user_text = (
                 f"<b>Заказ #{order.id} оплачен.</b>\n\n"
                 f"Позиция <b>{escape(item.title)}</b> оформлена как <b>вход по коду</b>.\n"
                 f"Менеджер: <b>{escape(normalized_manager)}</b>\n\n"
                 "Отправьте менеджеру этот шаблон сообщения:\n"
-                f"<code>{escape(item.delivery_content)}</code>"
+                f"<code>{escape(rendered_template)}</code>"
             )
             try:
                 await bot.send_message(order.user_id, user_text)
