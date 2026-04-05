@@ -38,6 +38,11 @@ class Product(Base):
 
     category: Mapped[Category | None] = relationship(back_populates="products")
     cart_items: Mapped[list["CartItem"]] = relationship(back_populates="product", cascade="all, delete-orphan")
+    delivery_files: Mapped[list["ProductDeliveryFile"]] = relationship(
+        back_populates="product",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
 
 class CartItem(Base):
@@ -94,6 +99,20 @@ class OrderItem(Base):
     delivery_content: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     order: Mapped[Order] = relationship(back_populates="items")
+
+
+class ProductDeliveryFile(Base):
+    __tablename__ = "product_delivery_files"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    telegram_file_id: Mapped[str] = mapped_column(String(255))
+    file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    reserved_order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id", ondelete="SET NULL"), nullable=True, index=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    product: Mapped[Product] = relationship(back_populates="delivery_files")
 
 
 class Payment(Base):
@@ -161,3 +180,4 @@ class RequestRateLimit(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     scope: Mapped[str] = mapped_column(String(32), index=True)
     last_hit_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+

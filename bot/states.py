@@ -30,3 +30,5 @@ class CreateProductStates(StatesGroup):
 class EditProductStates(StatesGroup):
     value = State()
     image = State()
+    delivery_files = State()
+

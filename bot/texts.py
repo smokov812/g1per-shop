@@ -30,6 +30,7 @@ def product_caption(product, currency: str) -> str:
 def admin_product_caption(product, currency: str) -> str:
     category_name = product.category.title if product.category else "Без категории"
     visibility = "Активен" if product.is_active else "Скрыт"
+    available_zip_count = len([item for item in getattr(product, "delivery_files", []) if item.reserved_order_id is None])
 
     lines = [
         f"<b>Товар #{product.id}</b>",
@@ -39,13 +40,17 @@ def admin_product_caption(product, currency: str) -> str:
         f"<b>SKU:</b> {escape(product.sku)}",
         f"<b>Наличие:</b> {escape(STOCK_STATUS_LABELS.get(product.stock_status, product.stock_status))}",
         f"<b>Статус:</b> {escape(visibility)}",
+        f"<b>ZIP в пуле:</b> {available_zip_count}",
     ]
 
     if product.short_description:
         lines.append(f"<b>Краткое описание:</b> {escape(product.short_description)}")
     if product.full_description:
         lines.extend(["<b>Полное описание:</b>", escape(product.full_description)])
-    lines.append("<b>Автодоставка:</b> настроена" if product.delivery_content else "<b>Автодоставка:</b> не настроена")
+    if product.delivery_content:
+        lines.append("<b>Текст после выдачи:</b> настроен")
+    else:
+        lines.append("<b>Текст после выдачи:</b> не задан")
     lines.append("<b>Фото:</b> есть" if product.image else "<b>Фото:</b> нет")
     return "\n".join(lines)
 

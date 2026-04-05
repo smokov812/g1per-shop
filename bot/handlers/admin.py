@@ -17,7 +17,7 @@ from bot.const import (
     SKIP_BUTTON,
     TEXT_PRODUCT_FIELDS,
 )
-from bot.db.repositories import AdminAuditLogRepository, CategoryRepository, OrderRepository, ProductRepository
+from bot.db.repositories import AdminAuditLogRepository, CategoryRepository, DeliveryFileRepository, OrderRepository, ProductRepository
 from bot.filters import AdminFilter
 from bot.keyboards.admin import (
     admin_edit_fields_keyboard,
@@ -202,12 +202,12 @@ def get_admin_router(admin_id: int) -> Router:
 
         await state.update_data(full_description=value)
         await state.set_state(CreateProductStates.delivery_content)
-        await message.answer("Введите контент для автодоставки или нажмите «Пропустить».", reply_markup=skip_cancel_keyboard())
+        await message.answer("Введите текст, который нужно отправить вместе с ZIP, или нажмите «Пропустить».", reply_markup=skip_cancel_keyboard())
 
     @router.message(CreateProductStates.delivery_content, F.text)
     async def add_product_delivery_content(message: Message, state: FSMContext) -> None:
         try:
-            value = None if message.text == SKIP_BUTTON else validate_optional_text(message.text, "Контент автодоставки", 12000)
+            value = None if message.text == SKIP_BUTTON else validate_optional_text(message.text, "Текст после выдачи", 12000)
         except ValidationError as exc:
             await message.answer(str(exc))
             return
@@ -440,6 +440,16 @@ def get_admin_router(admin_id: int) -> Router:
             )
             return
 
+        if field == "delivery_files":
+            await state.set_state(EditProductStates.delivery_files)
+            await state.update_data(product_id=product_id)
+            await call.answer()
+            await call.message.answer(
+                "Отправляйте ZIP-файлы по одному сообщению. Когда закончите, нажмите «Отмена».",
+                reply_markup=simple_reply_keyboard(CANCEL_BUTTON),
+            )
+            return
+
         await state.set_state(EditProductStates.value)
         await state.update_data(product_id=product_id, field=field)
         await call.answer()
@@ -460,7 +470,7 @@ def get_admin_router(admin_id: int) -> Router:
             elif field == "full_description":
                 value = validate_optional_text(raw_value, "Полное описание", 3000)
             elif field == "delivery_content":
-                value = validate_optional_text(raw_value, "Контент автодоставки", 12000)
+                value = validate_optional_text(raw_value, "Текст после выдачи", 12000)
             elif field == "price":
                 value = validate_price(raw_value)
             elif field == "sku":
@@ -545,6 +555,48 @@ def get_admin_router(admin_id: int) -> Router:
         )
         await message.answer("Фото обновлено.", reply_markup=main_menu_keyboard(is_admin=message.from_user.id == config.admin_id))
         await message.answer(admin_product_caption(product, config.currency), reply_markup=admin_product_actions_keyboard(product.id, product.is_active))
+
+    @router.message(EditProductStates.delivery_files, F.document)
+    async def upload_product_delivery_file(message: Message, state: FSMContext, session_maker: async_sessionmaker, config: Config) -> None:
+        data = await state.get_data()
+        document = message.document
+        file_name = (document.file_name or "").strip()
+        if not file_name.lower().endswith(".zip"):
+            await message.answer("Нужен ZIP-файл. Отправьте архив с расширением .zip.")
+            return
+
+        async with session_maker() as session:
+            delivery_repo = DeliveryFileRepository(session)
+            product_repo = ProductRepository(session)
+            await delivery_repo.add_file(
+                product_id=data["product_id"],
+                telegram_file_id=document.file_id,
+                file_name=file_name,
+            )
+            product = await product_repo.get(data["product_id"])
+            available_count = await delivery_repo.count_available(data["product_id"])
+
+        await log_admin_action(
+            session_maker,
+            admin_id=message.from_user.id,
+            action="product_upload_delivery_zip",
+            entity_type="product",
+            entity_id=data["product_id"],
+            payload={"file_name": file_name},
+        )
+        await message.answer(
+            f"ZIP <b>{escape(file_name)}</b> добавлен в пул. Сейчас свободно: <b>{available_count}</b>.",
+            reply_markup=simple_reply_keyboard(CANCEL_BUTTON),
+        )
+        if product:
+            await message.answer(
+                admin_product_caption(product, config.currency),
+                reply_markup=admin_product_actions_keyboard(product.id, product.is_active),
+            )
+
+    @router.message(EditProductStates.delivery_files)
+    async def upload_product_delivery_file_invalid(message: Message) -> None:
+        await message.answer("Отправьте ZIP-файл документом или нажмите «Отмена».")
 
     @router.callback_query(F.data.startswith("admin:edit_category:"))
     async def edit_product_category(call: CallbackQuery, session_maker: async_sessionmaker, config: Config) -> None:
@@ -637,11 +689,14 @@ def get_admin_router(admin_id: int) -> Router:
 
         if status in {"paid", "completed"}:
             try:
-                await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=order.id)
+                await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=order.id, admin_id=config.admin_id)
             except Exception:
                 pass
 
     return router
+
+
+
 
 
 

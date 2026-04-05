@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -21,6 +21,7 @@ from bot.db.models import (
     Payment,
     PaymentEvent,
     Product,
+    ProductDeliveryFile,
     RequestRateLimit,
 )
 
@@ -69,13 +70,11 @@ class ProductRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    def _base_statement(self):
+        return select(Product).options(selectinload(Product.category), selectinload(Product.delivery_files))
+
     async def list_by_category(self, category_id: int, only_active: bool = True) -> list[Product]:
-        statement = (
-            select(Product)
-            .options(selectinload(Product.category))
-            .where(Product.category_id == category_id)
-            .order_by(Product.created_at.desc())
-        )
+        statement = self._base_statement().where(Product.category_id == category_id).order_by(Product.created_at.desc())
         if only_active:
             statement = statement.where(Product.is_active.is_(True))
 
@@ -83,19 +82,15 @@ class ProductRepository:
         return list(result.scalars().all())
 
     async def list_all(self) -> list[Product]:
-        result = await self.session.execute(
-            select(Product).options(selectinload(Product.category)).order_by(Product.created_at.desc())
-        )
+        result = await self.session.execute(self._base_statement().order_by(Product.created_at.desc()))
         return list(result.scalars().all())
 
     async def get(self, product_id: int) -> Product | None:
-        result = await self.session.execute(
-            select(Product).options(selectinload(Product.category)).where(Product.id == product_id)
-        )
+        result = await self.session.execute(self._base_statement().where(Product.id == product_id))
         return result.scalar_one_or_none()
 
     async def get_by_sku(self, sku: str) -> Product | None:
-        result = await self.session.execute(select(Product).where(Product.sku == sku))
+        result = await self.session.execute(self._base_statement().where(Product.sku == sku))
         return result.scalar_one_or_none()
 
     async def create(self, **fields) -> Product | None:
@@ -134,6 +129,71 @@ class ProductRepository:
         await self.session.delete(product)
         await self.session.commit()
         return True
+
+
+class DeliveryFileRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def add_file(self, *, product_id: int, telegram_file_id: str, file_name: str | None = None) -> ProductDeliveryFile:
+        delivery_file = ProductDeliveryFile(
+            product_id=product_id,
+            telegram_file_id=telegram_file_id,
+            file_name=file_name,
+        )
+        self.session.add(delivery_file)
+        await self.session.commit()
+        await self.session.refresh(delivery_file)
+        return delivery_file
+
+    async def count_available(self, product_id: int) -> int:
+        result = await self.session.execute(
+            select(func.count(ProductDeliveryFile.id)).where(
+                ProductDeliveryFile.product_id == product_id,
+                ProductDeliveryFile.reserved_order_id.is_(None),
+            )
+        )
+        return int(result.scalar_one() or 0)
+
+    async def reserve_for_order(self, *, product_id: int, order_id: int, quantity: int) -> list[ProductDeliveryFile]:
+        result = await self.session.execute(
+            select(ProductDeliveryFile)
+            .where(
+                ProductDeliveryFile.product_id == product_id,
+                ProductDeliveryFile.reserved_order_id.is_(None),
+            )
+            .order_by(ProductDeliveryFile.created_at.asc(), ProductDeliveryFile.id.asc())
+            .limit(quantity)
+        )
+        files = list(result.scalars().all())
+        if len(files) < quantity:
+            await self.session.rollback()
+            return []
+
+        for file in files:
+            file.reserved_order_id = order_id
+
+        await self.session.commit()
+        return files
+
+    async def get_reserved_for_order(self, order_id: int) -> list[ProductDeliveryFile]:
+        result = await self.session.execute(
+            select(ProductDeliveryFile)
+            .where(ProductDeliveryFile.reserved_order_id == order_id)
+            .order_by(ProductDeliveryFile.created_at.asc(), ProductDeliveryFile.id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def mark_delivered(self, file_ids: list[int]) -> None:
+        if not file_ids:
+            return
+
+        result = await self.session.execute(select(ProductDeliveryFile).where(ProductDeliveryFile.id.in_(file_ids)))
+        files = list(result.scalars().all())
+        now = datetime.utcnow()
+        for file in files:
+            file.delivered_at = now
+        await self.session.commit()
 
 
 class CartRepository:
@@ -674,6 +734,4 @@ def _parse_order_id(value) -> int | None:
     if raw and raw.isdigit():
         return int(raw)
     return None
-
-
 
