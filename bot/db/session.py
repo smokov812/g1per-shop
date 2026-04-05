@@ -19,6 +19,10 @@ ADDITIONAL_COLUMNS = {
         "payment_txid": "VARCHAR(255)",
         "paid_at": "TIMESTAMP NULL",
         "delivery_sent_at": "TIMESTAMP NULL",
+        "preorder_delivery_sent_at": "TIMESTAMP NULL",
+    },
+    "product_delivery_files": {
+        "sync_key": "VARCHAR(255)",
     },
     "products": {
         "delivery_content": "TEXT",
@@ -88,5 +92,6 @@ async def _apply_postgres_migrations(connection) -> None:
 async def _list_sqlite_columns(connection, table_name: str) -> set[str]:
     result = await connection.exec_driver_sql(f"PRAGMA table_info({table_name})")
     return {row[1] for row in result.fetchall()}
+
 
 

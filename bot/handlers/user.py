@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from bot.config import Config
 from bot.const import CART_BUTTON, CATALOG_BUTTON, PAYMENT_PROVIDER_LABELS, SKIP_BUTTON, OrderStatus, StockStatus
-from bot.db.repositories import CartRepository, CategoryRepository, OrderRepository, PaymentRepository, ProductRepository
+from bot.db.repositories import CartRepository, CategoryRepository, DeliveryFileRepository, OrderRepository, PaymentRepository, ProductRepository
 from bot.keyboards.admin import admin_order_keyboard
 from bot.keyboards.user import (
     cart_keyboard,
@@ -151,6 +151,11 @@ def get_user_router() -> Router:
             if product.stock_status == StockStatus.OUT_OF_STOCK.value:
                 await call.answer("Товара нет в наличии.", show_alert=True)
                 return
+            if product.delivery_files:
+                available_count = await DeliveryFileRepository(session).count_available(product_id)
+                if available_count <= 0:
+                    await call.answer("Этот вариант уже выкуплен или временно недоступен.", show_alert=True)
+                    return
             await CartRepository(session).add_item(call.from_user.id, product_id)
 
         await call.answer("Товар добавлен в корзину.", show_alert=True)
@@ -369,5 +374,6 @@ def get_user_router() -> Router:
         await bot.send_message(config.admin_id, admin_text, reply_markup=admin_order_keyboard(order.id))
 
     return router
+
 
 

@@ -5,6 +5,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
 from sqlalchemy import delete, func, select, update as sql_update
 from sqlalchemy.exc import IntegrityError
@@ -24,6 +25,18 @@ from bot.db.models import (
     ProductDeliveryFile,
     RequestRateLimit,
 )
+
+
+def _derive_delivery_sync_key(file_name: str | None) -> str | None:
+    if not file_name:
+        return None
+
+    stem = Path(file_name).stem.strip().lower()
+    if not stem or "__" not in stem:
+        return None
+
+    sync_key = stem.split("__", 1)[0].strip(" _-")
+    return sync_key or None
 
 
 @dataclass(slots=True)
@@ -173,6 +186,7 @@ class DeliveryFileRepository:
             product_id=product_id,
             telegram_file_id=telegram_file_id,
             file_name=file_name,
+            sync_key=_derive_delivery_sync_key(file_name),
         )
         self.session.add(delivery_file)
         await self.session.commit()
@@ -203,8 +217,22 @@ class DeliveryFileRepository:
             await self.session.rollback()
             return []
 
+        sync_keys: set[str] = set()
         for file in files:
             file.reserved_order_id = order_id
+            if file.sync_key:
+                sync_keys.add(file.sync_key)
+
+        if sync_keys:
+            sibling_result = await self.session.execute(
+                select(ProductDeliveryFile).where(
+                    ProductDeliveryFile.sync_key.in_(tuple(sync_keys)),
+                    ProductDeliveryFile.reserved_order_id.is_(None),
+                )
+            )
+            sibling_files = list(sibling_result.scalars().all())
+            for sibling in sibling_files:
+                sibling.reserved_order_id = order_id
 
         await self.session.commit()
         return files
@@ -366,6 +394,16 @@ class OrderRepository:
             return None
 
         order.delivery_sent_at = sent_at or datetime.utcnow()
+        await self.session.commit()
+        await self.session.refresh(order)
+        return await self.get(order.id)
+
+    async def mark_preorder_delivery_sent(self, order_id: int, sent_at: datetime | None = None) -> Order | None:
+        order = await self.get(order_id)
+        if not order:
+            return None
+
+        order.preorder_delivery_sent_at = sent_at or datetime.utcnow()
         await self.session.commit()
         await self.session.refresh(order)
         return await self.get(order.id)
@@ -768,6 +806,13 @@ def _parse_order_id(value) -> int | None:
     if raw and raw.isdigit():
         return int(raw)
     return None
+
+
+
+
+
+
+
 
 
 

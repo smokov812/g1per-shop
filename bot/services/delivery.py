@@ -87,14 +87,14 @@ async def deliver_order_digital_content(
         reserved_files.extend(new_files)
 
     pending_files = [file for file in reserved_files if file.delivered_at is None]
-    delivered_anything = False
+    delivery_completed = False
 
     if pending_files:
         await bot.send_message(
             order.user_id,
             f"<b>Ваш заказ #{order.id} оплачен.</b>\n\nНиже ZIP-файлы по вашему заказу.",
         )
-        delivered_anything = True
+        delivery_completed = True
 
     for file in pending_files:
         caption = f"Заказ #{order.id}"
@@ -105,20 +105,15 @@ async def deliver_order_digital_content(
             await DeliveryFileRepository(session).mark_delivered([file.id])
 
     if text_items:
-        delivered_anything = True
+        delivery_completed = True
     for item in text_items:
         await bot.send_message(
             order.user_id,
             f"<b>{escape(item.title)}</b>\n\n{escape(item.delivery_content or '')}",
         )
 
-    if preorder_items:
+    if preorder_items and admin_id:
         preorder_titles = ", ".join(escape(item.title) for item in preorder_items)
-        user_text = (
-            f"<b>Заказ #{order.id} оплачен.</b>\n\n"
-            f"Позиции <b>{preorder_titles}</b> оформлены как <b>под заказ</b>. "
-            "По ним выдача будет выполнена админом вручную."
-        )
         admin_text = (
             f"<b>В заказе #{order.id} есть товары под заказ</b>\n\n"
             f"Покупатель: <b>{escape(order.customer_name)}</b>\n"
@@ -126,17 +121,11 @@ async def deliver_order_digital_content(
             "Автовыдача для них отключена, нужна ручная обработка."
         )
         try:
-            await bot.send_message(order.user_id, user_text)
+            await bot.send_message(admin_id, admin_text)
         except Exception:
             pass
-        if admin_id:
-            try:
-                await bot.send_message(admin_id, admin_text)
-            except Exception:
-                pass
-        delivered_anything = True
 
-    if not delivered_anything:
+    if not delivery_completed:
         return False
 
     async with session_maker() as session:

@@ -79,6 +79,7 @@ class Order(Base):
     payment_txid: Mapped[str | None] = mapped_column(String(255), nullable=True)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     delivery_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    preorder_delivery_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan", lazy="selectin")
@@ -109,6 +110,7 @@ class ProductDeliveryFile(Base):
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
     telegram_file_id: Mapped[str] = mapped_column(String(255))
     file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    sync_key: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     reserved_order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id", ondelete="SET NULL"), nullable=True, index=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -181,6 +183,7 @@ class RequestRateLimit(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     scope: Mapped[str] = mapped_column(String(32), index=True)
     last_hit_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
 
 
 

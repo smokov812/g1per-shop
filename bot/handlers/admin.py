@@ -548,7 +548,7 @@ def get_admin_router(admin_id: int) -> Router:
             await state.update_data(product_id=product_id)
             await call.answer()
             await call.message.answer(
-                "Отправляйте ZIP-файлы по одному сообщению. Когда закончите, нажмите «Отмена».",
+                "Отправляйте ZIP-файлы по одному сообщению. Для синхронизации вариантов используйте одинаковый префикс до __, например acc001__tdata.zip и acc001__session.zip. Для товаров под заказ можно загружать ZIP-заглушки только для учета остатков.",
                 reply_markup=simple_reply_keyboard(CANCEL_BUTTON),
             )
             return
@@ -671,7 +671,7 @@ def get_admin_router(admin_id: int) -> Router:
         async with session_maker() as session:
             delivery_repo = DeliveryFileRepository(session)
             product_repo = ProductRepository(session)
-            await delivery_repo.add_file(
+            delivery_file = await delivery_repo.add_file(
                 product_id=data["product_id"],
                 telegram_file_id=document.file_id,
                 file_name=file_name,
@@ -687,8 +687,13 @@ def get_admin_router(admin_id: int) -> Router:
             entity_id=data["product_id"],
             payload={"file_name": file_name},
         )
+        sync_note = (
+            f" Синхроключ: <code>{escape(delivery_file.sync_key)}</code>."
+            if delivery_file.sync_key
+            else " Для синхронизации вариантов используйте имя вида <code>acc001__tdata.zip</code>."
+        )
         await message.answer(
-            f"ZIP <b>{escape(file_name)}</b> добавлен в пул. Сейчас свободно: <b>{available_count}</b>.",
+            f"ZIP <b>{escape(file_name)}</b> добавлен в пул. Сейчас свободно: <b>{available_count}</b>.{sync_note}",
             reply_markup=simple_reply_keyboard(CANCEL_BUTTON),
         )
         if product:
@@ -773,7 +778,7 @@ def get_admin_router(admin_id: int) -> Router:
 
         has_preorder_items = any(item.stock_status == "preorder" for item in order.items)
         if has_preorder_items:
-            if order.delivery_sent_at:
+            if order.preorder_delivery_sent_at:
                 await call.answer("Выдача уже выполнена.", show_alert=True)
                 return
 
@@ -835,7 +840,7 @@ def get_admin_router(admin_id: int) -> Router:
         try:
             await bot.send_document(order.user_id, document.file_id, caption=caption)
             async with session_maker() as session:
-                updated_order = await OrderRepository(session).mark_delivery_sent(order.id)
+                updated_order = await OrderRepository(session).mark_preorder_delivery_sent(order.id)
         except Exception:
             await message.answer("Не удалось отправить файл покупателю.")
             return
@@ -893,6 +898,9 @@ def get_admin_router(admin_id: int) -> Router:
                 pass
 
     return router
+
+
+
 
 
 
