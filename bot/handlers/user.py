@@ -25,7 +25,7 @@ from bot.keyboards.user import (
 from bot.services import BasePaymentService, PaymentContext
 from bot.states import CheckoutStates
 from bot.texts import cart_text, order_text, product_caption
-from bot.validators import ValidationError, validate_optional_text, validate_required_text
+from bot.validators import ValidationError, validate_optional_text
 
 
 async def send_product_message(message: Message, product, currency: str) -> None:
@@ -64,8 +64,7 @@ async def send_checkout_summary(
     text = (
         "<b>Проверьте заказ</b>\n\n"
         f"{summary}\n\n"
-        f"<b>Имя:</b> {escape(data['customer_name'])}\n"
-        f"<b>Контакт:</b> {escape(data['contact'])}\n"
+        f"<b>Telegram:</b> {escape(data['customer_name'])}\n"
         f"<b>Комментарий:</b> {escape(comment) if comment else 'без комментария'}\n"
         f"<b>Оплата:</b> {escape(provider_label)}\n\n"
         f"{payment_service.checkout_hint()}"
@@ -192,36 +191,11 @@ def get_user_router() -> Router:
             await call.answer("Корзина пуста.", show_alert=True)
             return
 
-        await state.set_state(CheckoutStates.customer_name)
-        await call.answer()
-        await call.message.answer("Введите имя покупателя.", reply_markup=simple_reply_keyboard("Отмена"))
-
-    @router.message(CheckoutStates.customer_name, F.text)
-    async def checkout_customer_name(message: Message, state: FSMContext) -> None:
-        try:
-            customer_name = validate_required_text(message.text, "Имя", 120)
-        except ValidationError as exc:
-            await message.answer(str(exc))
-            return
-
-        await state.update_data(customer_name=customer_name)
-        await state.set_state(CheckoutStates.contact)
-        await message.answer(
-            "Укажите контакт для связи: Telegram, @username, email или другой удобный способ.",
-            reply_markup=simple_reply_keyboard("Отмена"),
-        )
-
-    @router.message(CheckoutStates.contact, F.text)
-    async def checkout_contact(message: Message, state: FSMContext) -> None:
-        try:
-            contact = validate_required_text(message.text, "Контакт", 255)
-        except ValidationError as exc:
-            await message.answer(str(exc))
-            return
-
-        await state.update_data(contact=contact)
+        username = f"@{call.from_user.username}" if call.from_user.username else f"id:{call.from_user.id}"
+        await state.update_data(customer_name=username, contact=username)
         await state.set_state(CheckoutStates.comment)
-        await message.answer(
+        await call.answer()
+        await call.message.answer(
             "Комментарий к заказу. Если не нужен, нажмите «Пропустить».",
             reply_markup=skip_cancel_keyboard(),
         )
@@ -395,4 +369,5 @@ def get_user_router() -> Router:
         await bot.send_message(config.admin_id, admin_text, reply_markup=admin_order_keyboard(order.id))
 
     return router
+
 
