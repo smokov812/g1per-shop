@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import json
 import unittest
 from types import SimpleNamespace
 
@@ -22,13 +23,14 @@ class CryptomusSignatureTests(unittest.TestCase):
 
     def test_verify_webhook_payload_accepts_valid_signature(self) -> None:
         payload = {"uuid": "payment-1", "order_id": "42", "status": "paid", "is_final": True}
-        signed_payload = dict(payload)
-        signed_payload["sign"] = self.service._build_signature(payload)
-        self.assertTrue(self.service.verify_webhook_payload(signed_payload))
+        signature = self.service._build_signature(payload)
+        raw_body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        self.assertTrue(self.service.verify_webhook_payload(raw_body, {"sign": signature}))
 
     def test_verify_webhook_payload_rejects_invalid_signature(self) -> None:
-        payload = {"uuid": "payment-1", "order_id": "42", "status": "paid", "is_final": True, "sign": "broken"}
-        self.assertFalse(self.service.verify_webhook_payload(payload))
+        payload = {"uuid": "payment-1", "order_id": "42", "status": "paid", "is_final": True}
+        raw_body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        self.assertFalse(self.service.verify_webhook_payload(raw_body, {"sign": "broken"}))
 
 
 if __name__ == "__main__":

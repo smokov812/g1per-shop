@@ -5,8 +5,7 @@
 Проект поддерживает:
 
 - каталог, корзину, заказы, админку
-- `manual_crypto`
-- `cryptomus`
+- `manual_crypto`\r\n- `cryptomus`\r\n- `lzt_market`
 - webhook + polling fallback для подтверждения оплаты
 - `payments`, `payment_events`, `admin_audit_logs`
 - db-backed rate limiting
@@ -51,7 +50,7 @@
 - запуск через Docker Compose
 - reverse proxy перед ботом
 
-Когда получишь доступы от Cryptomus, переключение будет через `.env`, без ломки архитектуры.
+Когда получишь доступы от Cryptomus, переключение будет через `.env`, без ломки архитектуры.\r\n\r\nLOLZ Market тоже можно включить как второй провайдер через `ENABLED_PAYMENT_PROVIDERS`, если заполнены его API-переменные.
 
 ## Быстрый локальный запуск
 
@@ -239,3 +238,4 @@ docker compose -f docker-compose.prod.yml up -d --build
 - если нужен самый надежный и управляемый вариант: `Timeweb VPS + docker-compose.prod.yml`
 
 Я бы для магазина выбрал `Timeweb VPS`, потому что там меньше платформенных ограничений и проще потом без боли включить Cryptomus webhook.
+

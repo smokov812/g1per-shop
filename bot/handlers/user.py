@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from bot.config import Config
-from bot.const import CART_BUTTON, CATALOG_BUTTON, SKIP_BUTTON, OrderStatus, StockStatus
+from bot.const import CART_BUTTON, CATALOG_BUTTON, PAYMENT_PROVIDER_LABELS, SKIP_BUTTON, OrderStatus, StockStatus
 from bot.db.repositories import CartRepository, CategoryRepository, OrderRepository, PaymentRepository, ProductRepository
 from bot.keyboards.admin import admin_order_keyboard
 from bot.keyboards.user import (
@@ -16,6 +16,7 @@ from bot.keyboards.user import (
     categories_keyboard,
     checkout_confirm_keyboard,
     main_menu_keyboard,
+    payment_methods_keyboard,
     product_keyboard,
     products_keyboard,
     simple_reply_keyboard,
@@ -34,6 +35,42 @@ async def send_product_message(message: Message, product, currency: str) -> None
         await message.answer_photo(product.image, caption=caption, reply_markup=keyboard)
     else:
         await message.answer(caption, reply_markup=keyboard)
+
+
+async def send_checkout_summary(
+    *,
+    message: Message,
+    state: FSMContext,
+    session_maker: async_sessionmaker,
+    config: Config,
+    payment_service: BasePaymentService,
+) -> None:
+    async with session_maker() as session:
+        items = await CartRepository(session).list_items(message.from_user.id)
+
+    if not items:
+        await state.clear()
+        await message.answer(
+            "Корзина стала пустой. Оформление остановлено.",
+            reply_markup=main_menu_keyboard(is_admin=message.from_user.id == config.admin_id),
+        )
+        return
+
+    data = await state.get_data()
+    comment = data.get("comment")
+    provider_label = PAYMENT_PROVIDER_LABELS.get(data["payment_provider"], data["payment_provider"])
+    summary = cart_text(items, config.currency)
+    text = (
+        "<b>Проверьте заказ</b>\n\n"
+        f"{summary}\n\n"
+        f"<b>Имя:</b> {escape(data['customer_name'])}\n"
+        f"<b>Контакт:</b> {escape(data['contact'])}\n"
+        f"<b>Комментарий:</b> {escape(comment) if comment else 'без комментария'}\n"
+        f"<b>Оплата:</b> {escape(provider_label)}\n\n"
+        f"{payment_service.checkout_hint()}"
+    )
+    await state.set_state(CheckoutStates.confirm)
+    await message.answer(text, reply_markup=checkout_confirm_keyboard())
 
 
 
@@ -194,7 +231,7 @@ def get_user_router() -> Router:
         state: FSMContext,
         session_maker: async_sessionmaker,
         config: Config,
-        payment_service: BasePaymentService,
+        payment_services: dict[str, BasePaymentService],
     ) -> None:
         try:
             comment = None if message.text == SKIP_BUTTON else validate_optional_text(message.text, "Комментарий", 500)
@@ -204,29 +241,44 @@ def get_user_router() -> Router:
 
         await state.update_data(comment=comment)
 
-        async with session_maker() as session:
-            items = await CartRepository(session).list_items(message.from_user.id)
-
-        if not items:
-            await state.clear()
-            await message.answer(
-                "Корзина стала пустой. Оформление остановлено.",
-                reply_markup=main_menu_keyboard(is_admin=message.from_user.id == config.admin_id),
+        provider_codes = tuple(code for code in config.enabled_payment_providers if code in payment_services)
+        if len(provider_codes) == 1:
+            provider_code = provider_codes[0]
+            await state.update_data(payment_provider=provider_code)
+            await send_checkout_summary(
+                message=message,
+                state=state,
+                session_maker=session_maker,
+                config=config,
+                payment_service=payment_services[provider_code],
             )
             return
 
-        summary = cart_text(items, config.currency)
-        data = await state.get_data()
-        text = (
-            "<b>Проверьте заказ</b>\n\n"
-            f"{summary}\n\n"
-            f"<b>Имя:</b> {escape(data['customer_name'])}\n"
-            f"<b>Контакт:</b> {escape(data['contact'])}\n"
-            f"<b>Комментарий:</b> {escape(comment) if comment else 'без комментария'}\n\n"
-            f"{payment_service.checkout_hint()}"
+        await state.set_state(CheckoutStates.payment_method)
+        await message.answer("Выберите способ оплаты.", reply_markup=payment_methods_keyboard(provider_codes))
+
+    @router.callback_query(CheckoutStates.payment_method, F.data.startswith("user:checkout_provider:"))
+    async def checkout_payment_provider(
+        call: CallbackQuery,
+        state: FSMContext,
+        session_maker: async_sessionmaker,
+        config: Config,
+        payment_services: dict[str, BasePaymentService],
+    ) -> None:
+        provider_code = call.data.rsplit(":", 1)[-1]
+        if provider_code not in payment_services:
+            await call.answer("Способ оплаты недоступен.", show_alert=True)
+            return
+
+        await state.update_data(payment_provider=provider_code)
+        await call.answer()
+        await send_checkout_summary(
+            message=call.message,
+            state=state,
+            session_maker=session_maker,
+            config=config,
+            payment_service=payment_services[provider_code],
         )
-        await state.set_state(CheckoutStates.confirm)
-        await message.answer(text, reply_markup=checkout_confirm_keyboard())
 
     @router.callback_query(F.data == "user:checkout_cancel")
     async def cancel_checkout(call: CallbackQuery, state: FSMContext, config: Config) -> None:
@@ -244,10 +296,12 @@ def get_user_router() -> Router:
         session_maker: async_sessionmaker,
         config: Config,
         bot: Bot,
-        payment_service: BasePaymentService,
+        payment_services: dict[str, BasePaymentService],
     ) -> None:
         data = await state.get_data()
         instructions = None
+        payment_provider = data.get("payment_provider") or config.payment_provider
+        payment_service = payment_services[payment_provider]
 
         async with session_maker() as session:
             cart_repo = CartRepository(session)
@@ -303,7 +357,7 @@ def get_user_router() -> Router:
                     network=instructions.payment_network,
                     payment_url=instructions.payment_url,
                 )
-                target_status = OrderStatus.AWAITING_PAYMENT.value if instructions.provider == "cryptomus" else OrderStatus.NEW.value
+                target_status = OrderStatus.AWAITING_PAYMENT.value if instructions.provider in {"cryptomus", "lzt_market"} else OrderStatus.NEW.value
                 updated_order = await order_repo.update_status(order.id, target_status)
                 if updated_order:
                     order = updated_order

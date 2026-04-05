@@ -5,6 +5,7 @@ class CheckoutStates(StatesGroup):
     customer_name = State()
     contact = State()
     comment = State()
+    payment_method = State()
     confirm = State()
 
 

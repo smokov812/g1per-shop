@@ -25,6 +25,12 @@ SKIP_BUTTON = "Пропустить"
 CANCEL_BUTTON = "Отмена"
 REMOVE_PHOTO_BUTTON = "Удалить фото"
 
+PAYMENT_PROVIDER_LABELS = {
+    "manual_crypto": "Ручная крипто-оплата",
+    "cryptomus": "Cryptomus",
+    "lzt_market": "LOLZ Market",
+}
+
 STOCK_STATUS_LABELS = {
     StockStatus.IN_STOCK.value: "В наличии",
     StockStatus.PREORDER.value: "Под заказ",

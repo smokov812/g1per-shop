@@ -23,7 +23,7 @@ class CryptomusPaymentService(BasePaymentService):
 
     def checkout_hint(self) -> str:
         return (
-            "После подтверждения бот создаст ссылку на оплату через <b>CryptoMus</b>. "
+            "После подтверждения бот создаст ссылку на оплату через <b>Cryptomus</b>. "
             "После оплаты статус заказа обновится автоматически по webhook или резервной проверке статуса."
         )
 
@@ -56,7 +56,7 @@ class CryptomusPaymentService(BasePaymentService):
         lines = [
             f"<b>Заказ #{context.order_id} создан.</b>",
             "",
-            "Счет сформирован через <b>CryptoMus</b>.",
+            "Счет сформирован через <b>Cryptomus</b>.",
             f"К оплате: <b>{payer_amount:.2f} {payer_currency}</b>",
             f"Сеть: <b>{network}</b>",
         ]
@@ -88,13 +88,14 @@ class CryptomusPaymentService(BasePaymentService):
         payload = {"uuid": external_payment_id} if external_payment_id else {"order_id": str(order_id)}
         return await asyncio.to_thread(self._request_sync, self.payment_info_url, payload)
 
-    def verify_webhook_payload(self, payload: dict) -> bool:
-        sign = str(payload.get("sign") or "")
+    def verify_webhook_payload(self, raw_body: bytes, headers: dict[str, str] | None = None) -> bool:
+        if not headers:
+            return False
+        sign = headers.get("sign") or headers.get("Sign") or headers.get("SIGN")
         if not sign:
             return False
-        clean_payload = dict(payload)
-        clean_payload.pop("sign", None)
-        expected = self._build_signature(clean_payload)
+        payload = json.loads(raw_body.decode("utf-8"))
+        expected = self._build_signature(payload)
         return hmac.compare_digest(expected, sign)
 
     def _request_sync(self, url: str, payload: dict) -> dict:
@@ -117,14 +118,14 @@ class CryptomusPaymentService(BasePaymentService):
                 raw = response.read().decode("utf-8")
         except HTTPError as exc:
             raw = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"CryptoMus API error: {raw}") from exc
+            raise RuntimeError(f"Cryptomus API error: {raw}") from exc
         except URLError as exc:
-            raise RuntimeError(f"CryptoMus network error: {exc}") from exc
+            raise RuntimeError(f"Cryptomus network error: {exc}") from exc
 
         decoded = json.loads(raw)
         result = decoded.get("result")
         if not isinstance(result, dict):
-            raise RuntimeError(f"CryptoMus invalid response: {raw}")
+            raise RuntimeError(f"Cryptomus invalid response: {raw}")
         return result
 
     def _build_signature(self, payload: dict) -> str:
@@ -134,4 +135,6 @@ class CryptomusPaymentService(BasePaymentService):
 
     @staticmethod
     def _serialize_payload(payload: dict) -> str:
-        return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("/", "\\/")
+        clean_payload = dict(payload)
+        clean_payload.pop("sign", None)
+        return json.dumps(clean_payload, ensure_ascii=False, separators=(",", ":")).replace("/", "\\/")

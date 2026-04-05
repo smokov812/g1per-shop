@@ -7,6 +7,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
+SUPPORTED_PAYMENT_PROVIDERS = {"manual_crypto", "cryptomus", "lzt_market"}
+
+
 def _env_bool(name: str, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -42,6 +45,7 @@ class Config:
     currency: str
     payment_message: str
     payment_provider: str
+    enabled_payment_providers: tuple[str, ...]
     crypto_asset: str
     crypto_network: str
     crypto_wallet: str
@@ -54,6 +58,15 @@ class Config:
     cryptomus_webhook_enabled: bool
     cryptomus_webhook_path: str
     cryptomus_allowed_ips: tuple[str, ...]
+    lzt_market_api_key: str
+    lzt_market_merchant_id: str
+    lzt_market_merchant_secret: str
+    lzt_market_currency: str
+    lzt_market_success_url: str
+    lzt_market_webhook_url: str
+    lzt_market_webhook_enabled: bool
+    lzt_market_webhook_path: str
+    lzt_market_lifetime_minutes: int
     web_server_enabled: bool
     web_server_host: str
     web_server_port: int
@@ -84,6 +97,9 @@ def load_config() -> Config:
     database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///shop.db").strip()
     currency = os.getenv("CURRENCY", "USDT").strip() or "USDT"
     payment_provider = os.getenv("PAYMENT_PROVIDER", "manual_crypto").strip() or "manual_crypto"
+    enabled_payment_providers = _normalize_payment_providers(
+        _env_list("ENABLED_PAYMENT_PROVIDERS", payment_provider)
+    )
     crypto_asset = os.getenv("CRYPTO_ASSET", currency).strip() or currency
     crypto_network = os.getenv("CRYPTO_NETWORK", "TRC20").strip() or "TRC20"
     crypto_wallet = os.getenv("CRYPTO_WALLET", "").strip()
@@ -93,6 +109,12 @@ def load_config() -> Config:
     cryptomus_return_url = os.getenv("CRYPTOMUS_RETURN_URL", "").strip()
     cryptomus_success_url = os.getenv("CRYPTOMUS_SUCCESS_URL", "").strip()
     cryptomus_webhook_url = os.getenv("CRYPTOMUS_WEBHOOK_URL", "").strip()
+    lzt_market_api_key = os.getenv("LZT_MARKET_API_KEY", "").strip()
+    lzt_market_merchant_id = os.getenv("LZT_MARKET_MERCHANT_ID", "").strip()
+    lzt_market_merchant_secret = os.getenv("LZT_MARKET_MERCHANT_SECRET", "").strip()
+    lzt_market_currency = os.getenv("LZT_MARKET_CURRENCY", currency).strip() or currency
+    lzt_market_success_url = os.getenv("LZT_MARKET_SUCCESS_URL", "").strip()
+    lzt_market_webhook_url = os.getenv("LZT_MARKET_WEBHOOK_URL", "").strip()
     payment_message = os.getenv(
         "PAYMENT_MESSAGE",
         "Оплата принимается только криптовалютой. После оформления админ пришлет реквизиты.",
@@ -112,6 +134,7 @@ def load_config() -> Config:
         currency=currency,
         payment_message=payment_message,
         payment_provider=payment_provider,
+        enabled_payment_providers=enabled_payment_providers,
         crypto_asset=crypto_asset,
         crypto_network=crypto_network,
         crypto_wallet=crypto_wallet,
@@ -124,6 +147,15 @@ def load_config() -> Config:
         cryptomus_webhook_enabled=_env_bool("CRYPTOMUS_WEBHOOK_ENABLED", False),
         cryptomus_webhook_path=os.getenv("CRYPTOMUS_WEBHOOK_PATH", "/webhooks/cryptomus").strip() or "/webhooks/cryptomus",
         cryptomus_allowed_ips=_env_list("CRYPTOMUS_ALLOWED_IPS", "91.227.144.54"),
+        lzt_market_api_key=lzt_market_api_key,
+        lzt_market_merchant_id=lzt_market_merchant_id,
+        lzt_market_merchant_secret=lzt_market_merchant_secret,
+        lzt_market_currency=lzt_market_currency,
+        lzt_market_success_url=lzt_market_success_url,
+        lzt_market_webhook_url=lzt_market_webhook_url,
+        lzt_market_webhook_enabled=_env_bool("LZT_MARKET_WEBHOOK_ENABLED", False),
+        lzt_market_webhook_path=os.getenv("LZT_MARKET_WEBHOOK_PATH", "/webhooks/lzt-market").strip() or "/webhooks/lzt-market",
+        lzt_market_lifetime_minutes=_env_int("LZT_MARKET_LIFETIME_MINUTES", 60),
         web_server_enabled=_env_bool("WEB_SERVER_ENABLED", True),
         web_server_host=os.getenv("WEB_SERVER_HOST", "0.0.0.0").strip() or "0.0.0.0",
         web_server_port=_env_int("WEB_SERVER_PORT", 8080),
@@ -135,3 +167,22 @@ def load_config() -> Config:
         message_rate_limit_seconds=_env_float("MESSAGE_RATE_LIMIT_SECONDS", 0.8),
         callback_rate_limit_seconds=_env_float("CALLBACK_RATE_LIMIT_SECONDS", 0.4),
     )
+
+
+
+def _normalize_payment_providers(providers: tuple[str, ...]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    for provider in providers:
+        value = provider.strip()
+        if not value:
+            continue
+        if value not in SUPPORTED_PAYMENT_PROVIDERS:
+            raise RuntimeError(
+                f"Неподдерживаемый payment provider: {value}. Доступные варианты: {', '.join(sorted(SUPPORTED_PAYMENT_PROVIDERS))}."
+            )
+        if value not in normalized:
+            normalized.append(value)
+
+    if not normalized:
+        normalized.append("manual_crypto")
+    return tuple(normalized)

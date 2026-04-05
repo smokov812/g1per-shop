@@ -3,7 +3,7 @@
 from aiogram.types import InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
-from bot.const import ADMIN_PANEL_BUTTON, CANCEL_BUTTON, CART_BUTTON, CATALOG_BUTTON, SKIP_BUTTON
+from bot.const import ADMIN_PANEL_BUTTON, CANCEL_BUTTON, CART_BUTTON, CATALOG_BUTTON, PAYMENT_PROVIDER_LABELS, SKIP_BUTTON
 
 
 def main_menu_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
@@ -14,6 +14,7 @@ def main_menu_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
     return builder.as_markup(resize_keyboard=True)
 
 
+
 def simple_reply_keyboard(*buttons: str) -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     for button in buttons:
@@ -21,8 +22,10 @@ def simple_reply_keyboard(*buttons: str) -> ReplyKeyboardMarkup:
     return builder.as_markup(resize_keyboard=True)
 
 
+
 def skip_cancel_keyboard() -> ReplyKeyboardMarkup:
     return simple_reply_keyboard(SKIP_BUTTON, CANCEL_BUTTON)
+
 
 
 def categories_keyboard(categories) -> InlineKeyboardMarkup:
@@ -33,6 +36,7 @@ def categories_keyboard(categories) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+
 def products_keyboard(products) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for product in products:
@@ -40,6 +44,7 @@ def products_keyboard(products) -> InlineKeyboardMarkup:
     builder.button(text="К категориям", callback_data="user:categories")
     builder.adjust(1)
     return builder.as_markup()
+
 
 
 def product_keyboard(product) -> InlineKeyboardMarkup:
@@ -53,6 +58,7 @@ def product_keyboard(product) -> InlineKeyboardMarkup:
         builder.button(text="К категориям", callback_data="user:categories")
     builder.adjust(1)
     return builder.as_markup()
+
 
 
 def cart_keyboard(items) -> InlineKeyboardMarkup | None:
@@ -71,6 +77,20 @@ def cart_keyboard(items) -> InlineKeyboardMarkup | None:
     builder.button(text="Продолжить покупки", callback_data="user:categories")
     builder.adjust(1)
     return builder.as_markup()
+
+
+
+def payment_methods_keyboard(provider_codes: tuple[str, ...]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for provider_code in provider_codes:
+        builder.button(
+            text=PAYMENT_PROVIDER_LABELS.get(provider_code, provider_code),
+            callback_data=f"user:checkout_provider:{provider_code}",
+        )
+    builder.button(text="Отменить", callback_data="user:checkout_cancel")
+    builder.adjust(1)
+    return builder.as_markup()
+
 
 
 def checkout_confirm_keyboard() -> InlineKeyboardMarkup:

@@ -42,3 +42,6 @@ class BasePaymentService(ABC):
 
     async def fetch_payment_status(self, *, external_payment_id: str | None, order_id: int) -> dict:
         raise RuntimeError(f"Провайдер {self.provider_code} не поддерживает polling статуса платежа.")
+
+    def verify_webhook_payload(self, raw_body: bytes, headers: dict[str, str] | None = None) -> bool:
+        return False
