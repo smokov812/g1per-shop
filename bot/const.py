@@ -50,7 +50,9 @@ TEXT_PRODUCT_FIELDS = {
     "short_description": "краткое описание",
     "full_description": "полное описание",
     "delivery_content": "текст после выдачи",
+    "post_payment_message": "инструкцию после оплаты",
     "price": "цену",
     "sku": "SKU",
 }
+
 

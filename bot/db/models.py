@@ -28,6 +28,7 @@ class Product(Base):
     short_description: Mapped[str | None] = mapped_column(String(500), nullable=True)
     full_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     delivery_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    post_payment_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     image: Mapped[str | None] = mapped_column(String(255), nullable=True)
     category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"), nullable=True)
@@ -99,6 +100,7 @@ class OrderItem(Base):
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     stock_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     delivery_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    post_payment_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     order: Mapped[Order] = relationship(back_populates="items")
 
@@ -183,6 +185,7 @@ class RequestRateLimit(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     scope: Mapped[str] = mapped_column(String(32), index=True)
     last_hit_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
 
 
 

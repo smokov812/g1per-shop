@@ -53,6 +53,10 @@ def admin_product_caption(product, currency: str) -> str:
         lines.append("<b>Текст после выдачи:</b> настроен")
     else:
         lines.append("<b>Текст после выдачи:</b> не задан")
+    if getattr(product, "post_payment_message", None):
+        lines.append("<b>Инструкция после оплаты:</b> настроена")
+    else:
+        lines.append("<b>Инструкция после оплаты:</b> не задана")
     lines.append("<b>Фото:</b> есть" if product.image else "<b>Фото:</b> нет")
     return "\n".join(lines)
 
@@ -123,4 +127,5 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
         lines.append(f"- {escape(item.title)}{suffix} x {item.quantity} = {format_price(subtotal, currency)}")
 
     return "\n".join(lines)
+
 

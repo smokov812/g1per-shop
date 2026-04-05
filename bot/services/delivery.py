@@ -142,9 +142,9 @@ async def deliver_order_digital_content(
     preorder_instruction_sent = False
     if preorder_items and normalized_manager:
         for item in preorder_items:
-            if not item.delivery_content:
+            if not item.post_payment_message:
                 continue
-            rendered_template = _render_delivery_template(item.delivery_content, order=order, item=item, manager_username=normalized_manager)
+            rendered_template = _render_delivery_template(item.post_payment_message, order=order, item=item, manager_username=normalized_manager)
             user_text = (
                 f"<b>Заказ #{order.id} оплачен.</b>\n\n"
                 f"Позиция <b>{escape(item.title)}</b> оформлена как <b>вход по коду</b>.\n"
@@ -180,3 +180,5 @@ async def deliver_order_digital_content(
         return updated_order is not None
 
     return True
+
+

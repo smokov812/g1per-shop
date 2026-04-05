@@ -371,6 +371,7 @@ class OrderRepository:
                     quantity=item.quantity,
                     stock_status=item.product.stock_status,
                     delivery_content=item.product.delivery_content,
+                    post_payment_message=item.product.post_payment_message,
                 )
             )
             await self.session.delete(item)
@@ -806,6 +807,7 @@ def _parse_order_id(value) -> int | None:
     if raw and raw.isdigit():
         return int(raw)
     return None
+
 
 
 

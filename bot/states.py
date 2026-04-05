@@ -23,6 +23,7 @@ class CreateProductStates(StatesGroup):
     short_description = State()
     full_description = State()
     delivery_content = State()
+    post_payment_message = State()
     price = State()
     sku = State()
     image = State()

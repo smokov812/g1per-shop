@@ -316,6 +316,21 @@ def get_admin_router(admin_id: int) -> Router:
             return
 
         await state.update_data(delivery_content=value)
+        await state.set_state(CreateProductStates.post_payment_message)
+        await message.answer(
+            "Введите инструкцию после оплаты для товаров под заказ или нажмите «Пропустить».",
+            reply_markup=skip_cancel_keyboard(),
+        )
+
+    @router.message(CreateProductStates.post_payment_message, F.text)
+    async def add_product_post_payment_message(message: Message, state: FSMContext) -> None:
+        try:
+            value = None if message.text == SKIP_BUTTON else validate_optional_text(message.text, "Инструкция после оплаты", 12000)
+        except ValidationError as exc:
+            await message.answer(str(exc))
+            return
+
+        await state.update_data(post_payment_message=value)
         await state.set_state(CreateProductStates.price)
         await message.answer("Введите цену, например 19.99", reply_markup=simple_reply_keyboard(CANCEL_BUTTON))
 
@@ -406,6 +421,7 @@ def get_admin_router(admin_id: int) -> Router:
                 short_description=data.get("short_description"),
                 full_description=data.get("full_description"),
                 delivery_content=data.get("delivery_content"),
+                post_payment_message=data.get("post_payment_message"),
                 price=data["price"],
                 image=data.get("image"),
                 category_id=data.get("category_id"),
@@ -434,6 +450,7 @@ def get_admin_router(admin_id: int) -> Router:
                 "stock_status": product.stock_status,
                 "is_active": product.is_active,
                 "has_delivery_content": bool(product.delivery_content),
+                "has_post_payment_message": bool(product.post_payment_message),
             },
         )
 
@@ -574,6 +591,8 @@ def get_admin_router(admin_id: int) -> Router:
                 value = validate_optional_text(raw_value, "Полное описание", 3000)
             elif field == "delivery_content":
                 value = validate_optional_text(raw_value, "Текст после выдачи", 12000)
+            elif field == "post_payment_message":
+                value = validate_optional_text(raw_value, "Инструкция после оплаты", 12000)
             elif field == "price":
                 value = validate_price(raw_value)
             elif field == "sku":
@@ -896,6 +915,7 @@ def get_admin_router(admin_id: int) -> Router:
                 pass
 
     return router
+
 
 
 
