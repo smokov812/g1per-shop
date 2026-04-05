@@ -8,11 +8,11 @@ from bot.const import ORDER_STATUS_LABELS, STOCK_STATUS_LABELS
 
 def admin_menu_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Создать категорию", callback_data="admin:create_category")
-    builder.button(text="Список категорий", callback_data="admin:categories")
-    builder.button(text="Добавить товар", callback_data="admin:add_product")
-    builder.button(text="Список товаров", callback_data="admin:products")
-    builder.button(text="Список заказов", callback_data="admin:orders")
+    builder.button(text="📂 Создать категорию", callback_data="admin:create_category")
+    builder.button(text="🗂️ Список категорий", callback_data="admin:categories")
+    builder.button(text="➕ Добавить товар", callback_data="admin:add_product")
+    builder.button(text="📦 Список товаров", callback_data="admin:products")
+    builder.button(text="🧾 Список заказов", callback_data="admin:orders")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -20,9 +20,9 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
 def category_picker_keyboard(categories, prefix: str, include_empty: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for category in categories:
-        builder.button(text=category.title, callback_data=f"{prefix}:{category.id}")
+        builder.button(text=f"📂 {category.title}", callback_data=f"{prefix}:{category.id}")
     if include_empty:
-        builder.button(text="Без категории", callback_data=f"{prefix}:none")
+        builder.button(text="📭 Без категории", callback_data=f"{prefix}:none")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -30,33 +30,38 @@ def category_picker_keyboard(categories, prefix: str, include_empty: bool = Fals
 def admin_categories_keyboard(categories) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for category in categories:
-        builder.button(text=category.title, callback_data=f"admin:category:{category.id}")
-    builder.button(text="К админ-панели", callback_data="admin:menu")
+        builder.button(text=f"📂 {category.title}", callback_data=f"admin:category:{category.id}")
+    builder.button(text="⬅️ К админ-панели", callback_data="admin:menu")
     builder.adjust(1)
     return builder.as_markup()
 
 
 def admin_category_actions_keyboard(category_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Переименовать", callback_data=f"admin:category_rename:{category_id}")
-    builder.button(text="Удалить", callback_data=f"admin:category_delete:{category_id}")
-    builder.button(text="К списку категорий", callback_data="admin:categories")
+    builder.button(text="✏️ Переименовать", callback_data=f"admin:category_rename:{category_id}")
+    builder.button(text="🗑️ Удалить", callback_data=f"admin:category_delete:{category_id}")
+    builder.button(text="⬅️ К списку категорий", callback_data="admin:categories")
     builder.adjust(1)
     return builder.as_markup()
 
 
 def stock_status_keyboard(prefix: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    icons = {
+        "in_stock": "✅",
+        "preorder": "🕒",
+        "out_of_stock": "⛔",
+    }
     for status, label in STOCK_STATUS_LABELS.items():
-        builder.button(text=label, callback_data=f"{prefix}:{status}")
+        builder.button(text=f"{icons.get(status, '•')} {label}", callback_data=f"{prefix}:{status}")
     builder.adjust(1)
     return builder.as_markup()
 
 
 def yes_no_keyboard(prefix: str, yes_text: str = "Да", no_text: str = "Нет") -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text=yes_text, callback_data=f"{prefix}:yes")
-    builder.button(text=no_text, callback_data=f"{prefix}:no")
+    builder.button(text=f"✅ {yes_text}", callback_data=f"{prefix}:yes")
+    builder.button(text=f"❌ {no_text}", callback_data=f"{prefix}:no")
     builder.adjust(2)
     return builder.as_markup()
 
@@ -65,8 +70,9 @@ def admin_products_keyboard(products) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for product in products:
         status = "активен" if product.is_active else "скрыт"
+        icon = "🟢" if product.is_active else "⚪"
         builder.button(
-            text=f"{product.title} [{status}]",
+            text=f"{icon} {product.title} [{status}]",
             callback_data=f"admin:product:{product.id}",
         )
     builder.adjust(1)
@@ -75,39 +81,39 @@ def admin_products_keyboard(products) -> InlineKeyboardMarkup:
 
 def admin_product_actions_keyboard(product_id: int, is_active: bool) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Редактировать", callback_data=f"admin:edit_menu:{product_id}")
+    builder.button(text="✏️ Редактировать", callback_data=f"admin:edit_menu:{product_id}")
     builder.button(
-        text="Скрыть" if is_active else "Показать",
+        text="🙈 Скрыть" if is_active else "👁️ Показать",
         callback_data=f"admin:toggle_active:{product_id}",
     )
-    builder.button(text="Удалить", callback_data=f"admin:delete:{product_id}")
-    builder.button(text="К списку товаров", callback_data="admin:products")
+    builder.button(text="🗑️ Удалить", callback_data=f"admin:delete:{product_id}")
+    builder.button(text="⬅️ К списку товаров", callback_data="admin:products")
     builder.adjust(1)
     return builder.as_markup()
 
 
 def admin_edit_fields_keyboard(product_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Название", callback_data=f"admin:edit_field:{product_id}:title")
-    builder.button(text="Краткое описание", callback_data=f"admin:edit_field:{product_id}:short_description")
-    builder.button(text="Полное описание", callback_data=f"admin:edit_field:{product_id}:full_description")
-    builder.button(text="Текст после выдачи", callback_data=f"admin:edit_field:{product_id}:delivery_content")
-    builder.button(text="Инструкция после оплаты", callback_data=f"admin:edit_field:{product_id}:post_payment_message")
-    builder.button(text="ZIP-пул", callback_data=f"admin:edit_field:{product_id}:delivery_files")
-    builder.button(text="Цена", callback_data=f"admin:edit_field:{product_id}:price")
-    builder.button(text="SKU", callback_data=f"admin:edit_field:{product_id}:sku")
-    builder.button(text="Фото", callback_data=f"admin:edit_field:{product_id}:image")
-    builder.button(text="Категория", callback_data=f"admin:edit_field:{product_id}:category")
-    builder.button(text="Наличие", callback_data=f"admin:edit_field:{product_id}:stock_status")
-    builder.button(text="Назад к товару", callback_data=f"admin:product:{product_id}")
+    builder.button(text="🏷️ Название", callback_data=f"admin:edit_field:{product_id}:title")
+    builder.button(text="📝 Краткое описание", callback_data=f"admin:edit_field:{product_id}:short_description")
+    builder.button(text="📄 Полное описание", callback_data=f"admin:edit_field:{product_id}:full_description")
+    builder.button(text="💬 Текст после выдачи", callback_data=f"admin:edit_field:{product_id}:delivery_content")
+    builder.button(text="📨 Инструкция после оплаты", callback_data=f"admin:edit_field:{product_id}:post_payment_message")
+    builder.button(text="🗜️ ZIP-пул", callback_data=f"admin:edit_field:{product_id}:delivery_files")
+    builder.button(text="💰 Цена", callback_data=f"admin:edit_field:{product_id}:price")
+    builder.button(text="🔖 SKU", callback_data=f"admin:edit_field:{product_id}:sku")
+    builder.button(text="🖼️ Фото", callback_data=f"admin:edit_field:{product_id}:image")
+    builder.button(text="📂 Категория", callback_data=f"admin:edit_field:{product_id}:category")
+    builder.button(text="📦 Наличие", callback_data=f"admin:edit_field:{product_id}:stock_status")
+    builder.button(text="⬅️ Назад к товару", callback_data=f"admin:product:{product_id}")
     builder.adjust(1)
     return builder.as_markup()
 
 
 def confirm_delete_keyboard(product_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Да, удалить", callback_data=f"admin:delete_confirm:{product_id}")
-    builder.button(text="Отмена", callback_data=f"admin:product:{product_id}")
+    builder.button(text="⚠️ Да, удалить", callback_data=f"admin:delete_confirm:{product_id}")
+    builder.button(text="❌ Отмена", callback_data=f"admin:product:{product_id}")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -117,7 +123,7 @@ def admin_orders_keyboard(orders, currency: str) -> InlineKeyboardMarkup:
     for order in orders:
         label = ORDER_STATUS_LABELS.get(order.status, order.status)
         builder.button(
-            text=f"#{order.id} | {label} | {order.total_amount:.2f} {currency}",
+            text=f"🧾 #{order.id} | {label} | {order.total_amount:.2f} {currency}",
             callback_data=f"admin:order:{order.id}",
         )
     builder.adjust(1)
@@ -126,10 +132,16 @@ def admin_orders_keyboard(orders, currency: str) -> InlineKeyboardMarkup:
 
 def admin_order_keyboard(order_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Выдать товар", callback_data=f"admin:order_deliver:{order_id}")
+    builder.button(text="📤 Выдать товар", callback_data=f"admin:order_deliver:{order_id}")
+    status_icons = {
+        "new": "🆕",
+        "awaiting_payment": "⏳",
+        "paid": "✅",
+        "completed": "🎉",
+        "canceled": "❌",
+    }
     for status, label in ORDER_STATUS_LABELS.items():
-        builder.button(text=label, callback_data=f"admin:order_status:{order_id}:{status}")
-    builder.button(text="К списку заказов", callback_data="admin:orders")
+        builder.button(text=f"{status_icons.get(status, '•')} {label}", callback_data=f"admin:order_status:{order_id}:{status}")
+    builder.button(text="⬅️ К списку заказов", callback_data="admin:orders")
     builder.adjust(1)
     return builder.as_markup()
-
