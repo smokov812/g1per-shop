@@ -56,3 +56,8 @@ TEXT_PRODUCT_FIELDS = {
 }
 
 
+
+
+def button_matches(text: str | None, label: str) -> bool:
+    value = (text or "").strip()
+    return value == label or value.endswith(f" {label}")

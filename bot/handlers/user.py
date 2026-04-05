@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from bot.config import Config
-from bot.const import CART_BUTTON, CATALOG_BUTTON, PAYMENT_PROVIDER_LABELS, SKIP_BUTTON, OrderStatus, StockStatus
+from bot.const import CART_BUTTON, CATALOG_BUTTON, PAYMENT_PROVIDER_LABELS, SKIP_BUTTON, OrderStatus, StockStatus, button_matches
 from bot.db.repositories import CartRepository, CategoryRepository, DeliveryFileRepository, OrderRepository, PaymentRepository, ProductRepository
 from bot.keyboards.admin import admin_order_keyboard
 from bot.keyboards.user import (
@@ -93,7 +93,7 @@ def get_user_router() -> Router:
 
         await target_message.answer(cart_text(items, currency), reply_markup=cart_keyboard(items))
 
-    @router.message(F.text == CATALOG_BUTTON)
+    @router.message(lambda message: button_matches(message.text, CATALOG_BUTTON))
     async def catalog_entry(message: Message, session_maker: async_sessionmaker) -> None:
         await show_categories(message, session_maker)
 
@@ -160,7 +160,7 @@ def get_user_router() -> Router:
 
         await call.answer("Товар добавлен в корзину.", show_alert=True)
 
-    @router.message(F.text == CART_BUTTON)
+    @router.message(lambda message: button_matches(message.text, CART_BUTTON))
     async def cart_entry(message: Message, session_maker: async_sessionmaker, config: Config) -> None:
         await show_cart(message, message.from_user.id, session_maker, config.currency)
 
@@ -214,7 +214,7 @@ def get_user_router() -> Router:
         payment_services: dict[str, BasePaymentService],
     ) -> None:
         try:
-            comment = None if message.text == SKIP_BUTTON else validate_optional_text(message.text, "Комментарий", 500)
+            comment = None if button_matches(message.text, SKIP_BUTTON) else validate_optional_text(message.text, "Комментарий", 500)
         except ValidationError as exc:
             await message.answer(str(exc))
             return
@@ -374,6 +374,7 @@ def get_user_router() -> Router:
         await bot.send_message(config.admin_id, admin_text, reply_markup=admin_order_keyboard(order.id))
 
     return router
+
 
 
 

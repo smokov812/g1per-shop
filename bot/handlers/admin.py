@@ -16,6 +16,7 @@ from bot.const import (
     REMOVE_PHOTO_BUTTON,
     SKIP_BUTTON,
     TEXT_PRODUCT_FIELDS,
+    button_matches,
 )
 from bot.db.repositories import AdminAuditLogRepository, CategoryRepository, DeliveryFileRepository, OrderRepository, ProductRepository
 from bot.filters import AdminFilter
@@ -100,7 +101,7 @@ def get_admin_router(admin_id: int) -> Router:
         await target_message.answer("Последние заказы:", reply_markup=admin_orders_keyboard(orders, currency))
 
     @router.message(Command("admin"))
-    @router.message(F.text == ADMIN_PANEL_BUTTON)
+    @router.message(lambda message: button_matches(message.text, ADMIN_PANEL_BUTTON))
     async def admin_panel_entry(message: Message) -> None:
         await show_admin_panel(message)
 
@@ -154,7 +155,7 @@ def get_admin_router(admin_id: int) -> Router:
     @router.message(CreateCategoryStates.description, F.text)
     async def create_category_description(message: Message, state: FSMContext, session_maker: async_sessionmaker, config: Config) -> None:
         try:
-            description = None if message.text == SKIP_BUTTON else validate_optional_text(message.text, "Описание категории", 500)
+            description = None if button_matches(message.text, SKIP_BUTTON) else validate_optional_text(message.text, "Описание категории", 500)
         except ValidationError as exc:
             await message.answer(str(exc))
             return
@@ -310,7 +311,7 @@ def get_admin_router(admin_id: int) -> Router:
     @router.message(CreateProductStates.delivery_content, F.text)
     async def add_product_delivery_content(message: Message, state: FSMContext) -> None:
         try:
-            value = None if message.text == SKIP_BUTTON else validate_optional_text(message.text, "Текст после выдачи", 12000)
+            value = None if button_matches(message.text, SKIP_BUTTON) else validate_optional_text(message.text, "Текст после выдачи", 12000)
         except ValidationError as exc:
             await message.answer(str(exc))
             return
@@ -325,7 +326,7 @@ def get_admin_router(admin_id: int) -> Router:
     @router.message(CreateProductStates.post_payment_message, F.text)
     async def add_product_post_payment_message(message: Message, state: FSMContext) -> None:
         try:
-            value = None if message.text == SKIP_BUTTON else validate_optional_text(message.text, "Инструкция после оплаты", 12000)
+            value = None if button_matches(message.text, SKIP_BUTTON) else validate_optional_text(message.text, "Инструкция после оплаты", 12000)
         except ValidationError as exc:
             await message.answer(str(exc))
             return
@@ -385,7 +386,7 @@ def get_admin_router(admin_id: int) -> Router:
 
     @router.message(CreateProductStates.image, F.text)
     async def add_product_image_text(message: Message, state: FSMContext, session_maker: async_sessionmaker) -> None:
-        image = None if message.text == SKIP_BUTTON else message.text.strip()
+        image = None if button_matches(message.text, SKIP_BUTTON) else message.text.strip()
         if image and len(image) > 255:
             await message.answer("Ссылка или file_id для фото слишком длинные. Максимум 255 символов.")
             return
@@ -654,7 +655,7 @@ def get_admin_router(admin_id: int) -> Router:
     @router.message(EditProductStates.image, F.text)
     async def edit_product_image_text(message: Message, state: FSMContext, session_maker: async_sessionmaker, config: Config) -> None:
         data = await state.get_data()
-        new_image = None if message.text == REMOVE_PHOTO_BUTTON else message.text.strip()
+        new_image = None if button_matches(message.text, REMOVE_PHOTO_BUTTON) else message.text.strip()
         if new_image and len(new_image) > 255:
             await message.answer("Ссылка или file_id для фото слишком длинные. Максимум 255 символов.")
             return
@@ -915,6 +916,8 @@ def get_admin_router(admin_id: int) -> Router:
                 pass
 
     return router
+
+
 
 
 

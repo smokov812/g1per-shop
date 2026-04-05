@@ -7,7 +7,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import FSInputFile, Message
 
-from bot.const import MAIN_MENU_BUTTON
+from bot.const import CANCEL_BUTTON, MAIN_MENU_BUTTON, button_matches
 from bot.keyboards.user import main_menu_keyboard
 
 BANNER_PATH = Path(__file__).resolve().parents[2] / "banner.png"
@@ -30,7 +30,7 @@ def get_common_router(admin_id: int) -> Router:
             await message.answer(text, reply_markup=main_menu_keyboard(is_admin=is_admin))
 
     @router.message(Command("cancel"))
-    @router.message(F.text == "Отмена")
+    @router.message(lambda message: button_matches(message.text, CANCEL_BUTTON))
     async def cancel_action(message: Message, state: FSMContext) -> None:
         current_state = await state.get_state()
         if current_state:
@@ -45,7 +45,7 @@ def get_common_router(admin_id: int) -> Router:
                 reply_markup=main_menu_keyboard(is_admin=message.from_user.id == admin_id),
             )
 
-    @router.message(F.text == MAIN_MENU_BUTTON)
+    @router.message(lambda message: button_matches(message.text, MAIN_MENU_BUTTON))
     async def show_main_menu(message: Message) -> None:
         await message.answer(
             "Главное меню.",
@@ -53,3 +53,4 @@ def get_common_router(admin_id: int) -> Router:
         )
 
     return router
+
