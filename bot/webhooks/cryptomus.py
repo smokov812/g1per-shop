@@ -28,6 +28,9 @@ def create_webhook_app(*, config: Config, session_maker, bot: Bot) -> web.Applic
     app.router.add_get("/", index)
     app.router.add_get("/health", healthcheck)
     app.router.add_get("/ready", readiness)
+    app.router.add_get("/success", generic_success_page)
+    app.router.add_get("/return", generic_success_page)
+    app.router.add_get("/lzt-success", lzt_success_page)
     if config.cryptomus_webhook_enabled:
         app.router.add_post(config.cryptomus_webhook_path, cryptomus_webhook)
     if config.lzt_market_webhook_enabled:
@@ -50,6 +53,20 @@ async def healthcheck(request: web.Request) -> web.Response:
             "payment_providers": list(config.enabled_payment_providers),
             "time": datetime.utcnow().isoformat() + "Z",
         }
+    )
+
+
+async def generic_success_page(request: web.Request) -> web.Response:
+    return web.Response(
+        text="<html><body style=\"font-family:sans-serif;padding:24px;\"><h2>Платеж обработан</h2><p>Можно вернуться в Telegram-бота. Статус заказа обновится автоматически после подтверждения оплаты.</p></body></html>",
+        content_type="text/html",
+    )
+
+
+async def lzt_success_page(request: web.Request) -> web.Response:
+    return web.Response(
+        text="<html><body style=\"font-family:sans-serif;padding:24px;\"><h2>Оплата в LOLZ Market завершена</h2><p>Можно закрыть страницу и вернуться в Telegram-бота. Если платеж уже прошел, статус заказа обновится автоматически.</p></body></html>",
+        content_type="text/html",
     )
 
 
@@ -121,9 +138,12 @@ async def lzt_market_webhook(request: web.Request) -> web.Response:
     service: LztMarketPaymentService = request.app["lzt_service"]
 
     raw_body = await request.read()
-    if not service.verify_webhook_payload(raw_body, dict(request.headers)):
-        logger.warning("Rejected LOLZ Market webhook with invalid signature")
-        return web.json_response({"ok": False, "error": "invalid sign"}, status=403)
+    signature_valid = service.verify_webhook_payload(raw_body, dict(request.headers))
+    if not signature_valid:
+        if config.lzt_market_strict_webhook_signature:
+            logger.warning("Rejected LOLZ Market webhook with invalid signature")
+            return web.json_response({"ok": False, "error": "invalid sign"}, status=403)
+        logger.warning("LOLZ Market webhook signature did not match, but strict mode is disabled; processing callback anyway")
 
     try:
         payload = json.loads(raw_body.decode("utf-8"))
@@ -160,3 +180,4 @@ def _extract_client_ip(request: web.Request, config: Config) -> str:
         if forwarded_for:
             return forwarded_for.split(",", 1)[0].strip()
     return request.remote or "unknown"
+

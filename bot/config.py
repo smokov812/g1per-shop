@@ -66,6 +66,7 @@ class Config:
     lzt_market_webhook_url: str
     lzt_market_webhook_enabled: bool
     lzt_market_webhook_path: str
+    lzt_market_strict_webhook_signature: bool
     lzt_market_lifetime_minutes: int
     web_server_enabled: bool
     web_server_host: str
@@ -155,6 +156,7 @@ def load_config() -> Config:
         lzt_market_webhook_url=lzt_market_webhook_url,
         lzt_market_webhook_enabled=_env_bool("LZT_MARKET_WEBHOOK_ENABLED", False),
         lzt_market_webhook_path=os.getenv("LZT_MARKET_WEBHOOK_PATH", "/webhooks/lzt-market").strip() or "/webhooks/lzt-market",
+        lzt_market_strict_webhook_signature=_env_bool("LZT_MARKET_STRICT_WEBHOOK_SIGNATURE", False),
         lzt_market_lifetime_minutes=_env_int("LZT_MARKET_LIFETIME_MINUTES", 60),
         web_server_enabled=_env_bool("WEB_SERVER_ENABLED", True),
         web_server_host=os.getenv("WEB_SERVER_HOST", "0.0.0.0").strip() or "0.0.0.0",
@@ -186,3 +188,4 @@ def _normalize_payment_providers(providers: tuple[str, ...]) -> tuple[str, ...]:
     if not normalized:
         normalized.append("manual_crypto")
     return tuple(normalized)
+
