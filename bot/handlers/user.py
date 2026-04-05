@@ -40,19 +40,20 @@ async def send_product_message(message: Message, product, currency: str) -> None
 async def send_checkout_summary(
     *,
     message: Message,
+    user_id: int,
     state: FSMContext,
     session_maker: async_sessionmaker,
     config: Config,
     payment_service: BasePaymentService,
 ) -> None:
     async with session_maker() as session:
-        items = await CartRepository(session).list_items(message.from_user.id)
+        items = await CartRepository(session).list_items(user_id)
 
     if not items:
         await state.clear()
         await message.answer(
             "Корзина стала пустой. Оформление остановлено.",
-            reply_markup=main_menu_keyboard(is_admin=message.from_user.id == config.admin_id),
+            reply_markup=main_menu_keyboard(is_admin=user_id == config.admin_id),
         )
         return
 
@@ -247,6 +248,7 @@ def get_user_router() -> Router:
             await state.update_data(payment_provider=provider_code)
             await send_checkout_summary(
                 message=message,
+                user_id=message.from_user.id,
                 state=state,
                 session_maker=session_maker,
                 config=config,
@@ -274,6 +276,7 @@ def get_user_router() -> Router:
         await call.answer()
         await send_checkout_summary(
             message=call.message,
+            user_id=call.from_user.id,
             state=state,
             session_maker=session_maker,
             config=config,
@@ -392,3 +395,4 @@ def get_user_router() -> Router:
         await bot.send_message(config.admin_id, admin_text, reply_markup=admin_order_keyboard(order.id))
 
     return router
+
