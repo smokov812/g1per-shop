@@ -45,6 +45,7 @@ def admin_product_caption(product, currency: str) -> str:
         lines.append(f"<b>Краткое описание:</b> {escape(product.short_description)}")
     if product.full_description:
         lines.extend(["<b>Полное описание:</b>", escape(product.full_description)])
+    lines.append("<b>Автодоставка:</b> настроена" if product.delivery_content else "<b>Автодоставка:</b> не настроена")
     lines.append("<b>Фото:</b> есть" if product.image else "<b>Фото:</b> нет")
     return "\n".join(lines)
 
@@ -91,6 +92,8 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
         lines.append(f"<b>TXID:</b> <code>{escape(order.payment_txid)}</code>")
     if order.paid_at:
         lines.append(f"<b>Оплачен:</b> {order.paid_at.strftime('%Y-%m-%d %H:%M')}")
+    if getattr(order, "delivery_sent_at", None):
+        lines.append(f"<b>Автовыдача:</b> {order.delivery_sent_at.strftime('%Y-%m-%d %H:%M')}")
 
     if include_customer:
         username = f"@{order.username}" if order.username else "не указан"
@@ -110,3 +113,4 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
         lines.append(f"- {escape(item.title)} x {item.quantity} = {format_price(subtotal, currency)}")
 
     return "\n".join(lines)
+

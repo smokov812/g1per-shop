@@ -1,27 +1,35 @@
 ﻿from __future__ import annotations
 
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
 from bot.db.base import Base
 from bot.db import models  # noqa: F401
 
 
-ORDER_ADDITIONAL_COLUMNS = {
-    "payment_provider": "ALTER TABLE orders ADD COLUMN payment_provider VARCHAR(32)",
-    "external_payment_id": "ALTER TABLE orders ADD COLUMN external_payment_id VARCHAR(128)",
-    "payment_url": "ALTER TABLE orders ADD COLUMN payment_url VARCHAR(500)",
-    "payment_status": "ALTER TABLE orders ADD COLUMN payment_status VARCHAR(64)",
-    "payment_currency": "ALTER TABLE orders ADD COLUMN payment_currency VARCHAR(32)",
-    "payment_network": "ALTER TABLE orders ADD COLUMN payment_network VARCHAR(64)",
-    "payment_amount": "ALTER TABLE orders ADD COLUMN payment_amount NUMERIC(18, 8)",
-    "payment_txid": "ALTER TABLE orders ADD COLUMN payment_txid VARCHAR(255)",
-    "paid_at": "ALTER TABLE orders ADD COLUMN paid_at DATETIME",
-}
-
-PAYMENT_EVENT_ADDITIONAL_COLUMNS = {
-    "payment_id": "ALTER TABLE payment_events ADD COLUMN payment_id INTEGER",
-    "source": "ALTER TABLE payment_events ADD COLUMN source VARCHAR(32) DEFAULT 'unknown'",
+ADDITIONAL_COLUMNS = {
+    "orders": {
+        "payment_provider": "VARCHAR(32)",
+        "external_payment_id": "VARCHAR(128)",
+        "payment_url": "VARCHAR(500)",
+        "payment_status": "VARCHAR(64)",
+        "payment_currency": "VARCHAR(32)",
+        "payment_network": "VARCHAR(64)",
+        "payment_amount": "NUMERIC(18, 8)",
+        "payment_txid": "VARCHAR(255)",
+        "paid_at": "TIMESTAMP NULL",
+        "delivery_sent_at": "TIMESTAMP NULL",
+    },
+    "products": {
+        "delivery_content": "TEXT",
+    },
+    "order_items": {
+        "delivery_content": "TEXT",
+    },
+    "payment_events": {
+        "payment_id": "INTEGER",
+        "source": "VARCHAR(32) DEFAULT 'unknown'",
+    },
 }
 
 
@@ -56,20 +64,26 @@ async def init_db(engine: AsyncEngine) -> None:
         await connection.run_sync(Base.metadata.create_all)
         if engine.dialect.name == "sqlite":
             await _apply_sqlite_migrations(connection)
+        elif engine.dialect.name == "postgresql":
+            await _apply_postgres_migrations(connection)
 
 
 async def _apply_sqlite_migrations(connection) -> None:
-    existing_order_columns = await _list_columns(connection, "orders")
-    for column_name, ddl in ORDER_ADDITIONAL_COLUMNS.items():
-        if column_name not in existing_order_columns:
-            await connection.exec_driver_sql(ddl)
-
-    existing_payment_event_columns = await _list_columns(connection, "payment_events")
-    for column_name, ddl in PAYMENT_EVENT_ADDITIONAL_COLUMNS.items():
-        if column_name not in existing_payment_event_columns:
-            await connection.exec_driver_sql(ddl)
+    for table_name, columns in ADDITIONAL_COLUMNS.items():
+        existing_columns = await _list_sqlite_columns(connection, table_name)
+        for column_name, definition in columns.items():
+            if column_name not in existing_columns:
+                await connection.exec_driver_sql(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
 
 
-async def _list_columns(connection, table_name: str) -> set[str]:
+async def _apply_postgres_migrations(connection) -> None:
+    for table_name, columns in ADDITIONAL_COLUMNS.items():
+        for column_name, definition in columns.items():
+            await connection.execute(
+                text(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {column_name} {definition}")
+            )
+
+
+async def _list_sqlite_columns(connection, table_name: str) -> set[str]:
     result = await connection.exec_driver_sql(f"PRAGMA table_info({table_name})")
     return {row[1] for row in result.fetchall()}

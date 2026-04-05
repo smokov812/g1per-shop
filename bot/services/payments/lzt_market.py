@@ -92,9 +92,7 @@ class LztMarketPaymentService(BasePaymentService):
         return await asyncio.to_thread(self._request_sync, method="GET", url=self.invoice_url, payload=params)
 
     def verify_webhook_payload(self, raw_body: bytes, headers: dict[str, str] | None = None) -> bool:
-        if not self.config.lzt_market_merchant_secret:
-            return False
-        if not headers:
+        if not self.config.lzt_market_merchant_secret or not headers:
             return False
 
         candidates = [
@@ -102,23 +100,50 @@ class LztMarketPaymentService(BasePaymentService):
             headers.get("x-signature"),
             headers.get("Signature"),
             headers.get("signature"),
+            headers.get("Sign"),
+            headers.get("sign"),
+            headers.get("X-Sign"),
+            headers.get("x-sign"),
+            headers.get("X-Webhook-Signature"),
+            headers.get("x-webhook-signature"),
             headers.get("X-Hub-Signature-256"),
             headers.get("x-hub-signature-256"),
             headers.get("X-Hub-Signature"),
             headers.get("x-hub-signature"),
         ]
-        candidates = [candidate for candidate in candidates if candidate]
+        candidates = [candidate.strip() for candidate in candidates if candidate and candidate.strip()]
         if not candidates:
             return False
 
-        sha256_hex = hmac.new(self.config.lzt_market_merchant_secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
-        sha1_hex = hmac.new(self.config.lzt_market_merchant_secret.encode("utf-8"), raw_body, hashlib.sha1).hexdigest()
-        expected_values = {
-            sha256_hex,
-            f"sha256={sha256_hex}",
-            sha1_hex,
-            f"sha1={sha1_hex}",
+        secret = self.config.lzt_market_merchant_secret.encode("utf-8")
+        raw_text = raw_body.decode("utf-8", errors="ignore")
+        variants = {
+            hmac.new(secret, raw_body, hashlib.sha256).hexdigest(),
+            hmac.new(secret, raw_body, hashlib.sha1).hexdigest(),
+            hmac.new(secret, raw_body, hashlib.md5).hexdigest(),
+            hashlib.sha256(secret + raw_body).hexdigest(),
+            hashlib.sha256(raw_body + secret).hexdigest(),
+            hashlib.sha1(secret + raw_body).hexdigest(),
+            hashlib.sha1(raw_body + secret).hexdigest(),
+            hashlib.md5(secret + raw_body).hexdigest(),
+            hashlib.md5(raw_body + secret).hexdigest(),
+            hashlib.sha256((self.config.lzt_market_merchant_secret + raw_text).encode("utf-8")).hexdigest(),
+            hashlib.sha256((raw_text + self.config.lzt_market_merchant_secret).encode("utf-8")).hexdigest(),
+            hashlib.sha1((self.config.lzt_market_merchant_secret + raw_text).encode("utf-8")).hexdigest(),
+            hashlib.sha1((raw_text + self.config.lzt_market_merchant_secret).encode("utf-8")).hexdigest(),
+            hashlib.md5((self.config.lzt_market_merchant_secret + raw_text).encode("utf-8")).hexdigest(),
+            hashlib.md5((raw_text + self.config.lzt_market_merchant_secret).encode("utf-8")).hexdigest(),
         }
+
+        expected_values = set()
+        for value in variants:
+            expected_values.add(value)
+            expected_values.add(value.lower())
+            expected_values.add(value.upper())
+            expected_values.add(f"sha256={value}")
+            expected_values.add(f"sha1={value}")
+            expected_values.add(f"md5={value}")
+
         return any(hmac.compare_digest(candidate, expected) for candidate in candidates for expected in expected_values)
 
     def _request_sync(self, *, method: str, url: str, payload: dict) -> dict:
@@ -194,5 +219,3 @@ class LztMarketPaymentService(BasePaymentService):
         if value in (None, ""):
             return None
         return str(value)
-
-

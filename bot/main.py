@@ -16,7 +16,7 @@ from bot.db.repositories import PaymentRepository
 from bot.db.session import create_session_maker, init_db
 from bot.handlers import get_admin_router, get_common_router, get_user_router
 from bot.middlewares import RateLimitMiddleware
-from bot.services import BasePaymentService, create_payment_services
+from bot.services import BasePaymentService, create_payment_services, deliver_order_digital_content
 from bot.webhooks import create_webhook_app, notify_payment_update
 
 logger = logging.getLogger(__name__)
@@ -134,6 +134,8 @@ async def payment_sync_worker(*, bot: Bot, config: Config, session_maker, paymen
 
                     if result.order and not result.duplicate and result.current_status != result.previous_status:
                         await notify_payment_update(bot=bot, config=config, order=result.order)
+                        if result.current_status in {"paid", "completed"}:
+                            await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=result.order.id)
 
             await asyncio.sleep(config.payment_sync_interval_seconds)
     except asyncio.CancelledError:

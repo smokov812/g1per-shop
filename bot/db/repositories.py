@@ -248,6 +248,7 @@ class OrderRepository:
                     sku=item.product.sku,
                     price=item.product.price,
                     quantity=item.quantity,
+                    delivery_content=item.product.delivery_content,
                 )
             )
             await self.session.delete(item)
@@ -261,6 +262,16 @@ class OrderRepository:
             return None
 
         order.status = status
+        await self.session.commit()
+        await self.session.refresh(order)
+        return await self.get(order.id)
+
+    async def mark_delivery_sent(self, order_id: int, sent_at: datetime | None = None) -> Order | None:
+        order = await self.get(order_id)
+        if not order:
+            return None
+
+        order.delivery_sent_at = sent_at or datetime.utcnow()
         await self.session.commit()
         await self.session.refresh(order)
         return await self.get(order.id)
@@ -663,3 +674,6 @@ def _parse_order_id(value) -> int | None:
     if raw and raw.isdigit():
         return int(raw)
     return None
+
+
+

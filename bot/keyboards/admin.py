@@ -72,6 +72,7 @@ def admin_edit_fields_keyboard(product_id: int) -> InlineKeyboardMarkup:
     builder.button(text="Название", callback_data=f"admin:edit_field:{product_id}:title")
     builder.button(text="Краткое описание", callback_data=f"admin:edit_field:{product_id}:short_description")
     builder.button(text="Полное описание", callback_data=f"admin:edit_field:{product_id}:full_description")
+    builder.button(text="Автодоставка", callback_data=f"admin:edit_field:{product_id}:delivery_content")
     builder.button(text="Цена", callback_data=f"admin:edit_field:{product_id}:price")
     builder.button(text="SKU", callback_data=f"admin:edit_field:{product_id}:sku")
     builder.button(text="Фото", callback_data=f"admin:edit_field:{product_id}:image")

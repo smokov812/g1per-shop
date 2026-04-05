@@ -27,6 +27,7 @@ class Product(Base):
     title: Mapped[str] = mapped_column(String(255))
     short_description: Mapped[str | None] = mapped_column(String(500), nullable=True)
     full_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    delivery_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     image: Mapped[str | None] = mapped_column(String(255), nullable=True)
     category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"), nullable=True)
@@ -72,6 +73,7 @@ class Order(Base):
     payment_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 8), nullable=True)
     payment_txid: Mapped[str | None] = mapped_column(String(255), nullable=True)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    delivery_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan", lazy="selectin")
@@ -89,6 +91,7 @@ class OrderItem(Base):
     sku: Mapped[str] = mapped_column(String(120))
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     quantity: Mapped[int] = mapped_column(Integer, default=1)
+    delivery_content: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     order: Mapped[Order] = relationship(back_populates="items")
 

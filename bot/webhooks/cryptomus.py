@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from bot.config import Config
 from bot.db.repositories import PaymentRepository
+from bot.services.delivery import deliver_order_digital_content
 from bot.services.payments.cryptomus import CryptomusPaymentService
 from bot.services.payments.lzt_market import LztMarketPaymentService
 from bot.texts import order_text
@@ -127,6 +128,8 @@ async def cryptomus_webhook(request: web.Request) -> web.Response:
 
     if result.order and not result.duplicate and result.current_status != result.previous_status:
         await notify_payment_update(bot=bot, config=config, order=result.order)
+        if result.current_status in {"paid", "completed"}:
+            await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=result.order.id)
 
     return web.json_response({"ok": True, "duplicate": result.duplicate, "applied": result.applied, "order_id": result.order.id if result.order else None})
 
@@ -156,6 +159,8 @@ async def lzt_market_webhook(request: web.Request) -> web.Response:
 
     if result.order and not result.duplicate and result.current_status != result.previous_status:
         await notify_payment_update(bot=bot, config=config, order=result.order)
+        if result.current_status in {"paid", "completed"}:
+            await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=result.order.id)
 
     return web.json_response({"ok": True, "duplicate": result.duplicate, "applied": result.applied, "order_id": result.order.id if result.order else None})
 
@@ -180,4 +185,3 @@ def _extract_client_ip(request: web.Request, config: Config) -> str:
         if forwarded_for:
             return forwarded_for.split(",", 1)[0].strip()
     return request.remote or "unknown"
-

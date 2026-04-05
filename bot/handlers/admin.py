@@ -32,6 +32,7 @@ from bot.keyboards.admin import (
     yes_no_keyboard,
 )
 from bot.keyboards.user import main_menu_keyboard, simple_reply_keyboard, skip_cancel_keyboard
+from bot.services import deliver_order_digital_content
 from bot.states import CreateCategoryStates, CreateProductStates, EditProductStates
 from bot.texts import admin_product_caption, order_text
 from bot.validators import ValidationError, validate_optional_text, validate_price, validate_required_text, validate_sku
@@ -200,8 +201,20 @@ def get_admin_router(admin_id: int) -> Router:
             return
 
         await state.update_data(full_description=value)
+        await state.set_state(CreateProductStates.delivery_content)
+        await message.answer("Введите контент для автодоставки или нажмите «Пропустить».", reply_markup=skip_cancel_keyboard())
+
+    @router.message(CreateProductStates.delivery_content, F.text)
+    async def add_product_delivery_content(message: Message, state: FSMContext) -> None:
+        try:
+            value = None if message.text == SKIP_BUTTON else validate_optional_text(message.text, "Контент автодоставки", 12000)
+        except ValidationError as exc:
+            await message.answer(str(exc))
+            return
+
+        await state.update_data(delivery_content=value)
         await state.set_state(CreateProductStates.price)
-        await message.answer("Введите цену, например 19.99")
+        await message.answer("Введите цену, например 19.99", reply_markup=simple_reply_keyboard(CANCEL_BUTTON))
 
     @router.message(CreateProductStates.price, F.text)
     async def add_product_price(message: Message, state: FSMContext) -> None:
@@ -289,6 +302,7 @@ def get_admin_router(admin_id: int) -> Router:
                 title=data["title"],
                 short_description=data.get("short_description"),
                 full_description=data.get("full_description"),
+                delivery_content=data.get("delivery_content"),
                 price=data["price"],
                 image=data.get("image"),
                 category_id=data.get("category_id"),
@@ -316,6 +330,7 @@ def get_admin_router(admin_id: int) -> Router:
                 "category_id": product.category_id,
                 "stock_status": product.stock_status,
                 "is_active": product.is_active,
+                "has_delivery_content": bool(product.delivery_content),
             },
         )
 
@@ -444,6 +459,8 @@ def get_admin_router(admin_id: int) -> Router:
                 value = validate_optional_text(raw_value, "Краткое описание", 500)
             elif field == "full_description":
                 value = validate_optional_text(raw_value, "Полное описание", 3000)
+            elif field == "delivery_content":
+                value = validate_optional_text(raw_value, "Контент автодоставки", 12000)
             elif field == "price":
                 value = validate_price(raw_value)
             elif field == "sku":
@@ -618,4 +635,18 @@ def get_admin_router(admin_id: int) -> Router:
         except Exception:
             pass
 
+        if status in {"paid", "completed"}:
+            try:
+                await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=order.id)
+            except Exception:
+                pass
+
     return router
+
+
+
+
+
+
+
+

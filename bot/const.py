@@ -49,6 +49,7 @@ TEXT_PRODUCT_FIELDS = {
     "title": "название",
     "short_description": "краткое описание",
     "full_description": "полное описание",
+    "delivery_content": "контент автодоставки",
     "price": "цену",
     "sku": "SKU",
 }
