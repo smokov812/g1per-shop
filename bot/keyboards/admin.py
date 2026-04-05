@@ -125,6 +125,7 @@ def admin_orders_keyboard(orders, currency: str) -> InlineKeyboardMarkup:
 
 def admin_order_keyboard(order_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    builder.button(text="Выдать товар", callback_data=f"admin:order_deliver:{order_id}")
     for status, label in ORDER_STATUS_LABELS.items():
         builder.button(text=label, callback_data=f"admin:order_status:{order_id}:{status}")
     builder.button(text="К списку заказов", callback_data="admin:orders")

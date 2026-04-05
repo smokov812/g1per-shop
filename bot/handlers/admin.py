@@ -761,6 +761,42 @@ def get_admin_router(admin_id: int) -> Router:
 
         await call.message.answer(order_text(order, config.currency, include_customer=True), reply_markup=admin_order_keyboard(order.id))
 
+    @router.callback_query(F.data.startswith("admin:order_deliver:"))
+    async def manual_deliver_order(call: CallbackQuery, session_maker: async_sessionmaker, config: Config, bot: Bot) -> None:
+        order_id = int(call.data.rsplit(":", 1)[-1])
+        async with session_maker() as session:
+            order = await OrderRepository(session).get(order_id)
+
+        if not order:
+            await call.answer("Заказ не найден.", show_alert=True)
+            return
+
+        try:
+            delivered = await deliver_order_digital_content(
+                bot=bot,
+                session_maker=session_maker,
+                order_id=order.id,
+                admin_id=config.admin_id,
+                include_preorder=True,
+            )
+        except Exception:
+            delivered = False
+
+        await log_admin_action(
+            session_maker,
+            admin_id=call.from_user.id,
+            action="order_manual_delivery",
+            entity_type="order",
+            entity_id=order.id,
+            payload={"delivered": delivered},
+        )
+
+        if delivered:
+            await call.answer("Выдача отправлена.")
+            await call.message.answer("Товар отправлен покупателю вручную из админки.")
+        else:
+            await call.answer("Выдача не выполнена.", show_alert=True)
+            await call.message.answer("Не удалось выполнить выдачу. Проверьте ZIP-пул, статус заказа и наличие уже отправленной выдачи.")
     @router.callback_query(F.data.startswith("admin:order_status:"))
     async def update_order_status(call: CallbackQuery, session_maker: async_sessionmaker, config: Config, bot: Bot) -> None:
         _, _, order_id_raw, status = call.data.split(":")
@@ -792,11 +828,12 @@ def get_admin_router(admin_id: int) -> Router:
 
         if status in {"paid", "completed"}:
             try:
-                await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=order.id, admin_id=config.admin_id)
+                await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=order.id, admin_id=config.admin_id, include_preorder=False)
             except Exception:
                 pass
 
     return router
+
 
 
 

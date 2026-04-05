@@ -4,11 +4,17 @@ from html import escape
 
 from aiogram import Bot
 
-
 from bot.db.repositories import DeliveryFileRepository, OrderRepository
 
 
-async def deliver_order_digital_content(*, bot: Bot, session_maker, order_id: int, admin_id: int | None = None) -> bool:
+async def deliver_order_digital_content(
+    *,
+    bot: Bot,
+    session_maker,
+    order_id: int,
+    admin_id: int | None = None,
+    include_preorder: bool = False,
+) -> bool:
     async with session_maker() as session:
         order = await OrderRepository(session).get(order_id)
 
@@ -21,7 +27,7 @@ async def deliver_order_digital_content(*, bot: Bot, session_maker, order_id: in
     preorder_items = []
 
     for item in order.items:
-        if item.stock_status == "preorder":
+        if item.stock_status == "preorder" and not include_preorder:
             preorder_items.append(item)
             continue
 

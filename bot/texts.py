@@ -23,6 +23,8 @@ def product_caption(product, currency: str) -> str:
         lines.extend(["", f"<b>Кратко:</b> {escape(product.short_description)}"])
     if product.full_description:
         lines.extend(["", f"<b>Описание:</b>\n{escape(product.full_description)}"])
+    if product.stock_status == "preorder":
+        lines.extend(["", "<b>Выдача:</b> вручную после оплаты"])
 
     return "\n".join(lines)
 
@@ -118,4 +120,3 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
         lines.append(f"- {escape(item.title)} x {item.quantity} = {format_price(subtotal, currency)}")
 
     return "\n".join(lines)
-
