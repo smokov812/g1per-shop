@@ -52,7 +52,7 @@ def categories_keyboard(categories) -> InlineKeyboardMarkup:
 def products_keyboard(products) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for product in products:
-        builder.button(text=f"🛍️ {product.title}", callback_data=f"user:product:{product.id}")
+        builder.button(text=product.title, callback_data=f"user:product:{product.id}")
     builder.button(text="⬅️ К категориям", callback_data="user:categories")
     builder.adjust(1)
     return builder.as_markup()
@@ -111,3 +111,4 @@ def checkout_confirm_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="❌ Отменить", callback_data="user:checkout_cancel")
     builder.adjust(1)
     return builder.as_markup()
+
