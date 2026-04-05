@@ -1,0 +1,43 @@
+﻿from bot.keyboards.admin import (
+    admin_edit_fields_keyboard,
+    admin_menu_keyboard,
+    admin_order_keyboard,
+    admin_orders_keyboard,
+    admin_product_actions_keyboard,
+    admin_products_keyboard,
+    category_picker_keyboard,
+    confirm_delete_keyboard,
+    stock_status_keyboard,
+    yes_no_keyboard,
+)
+from bot.keyboards.user import (
+    cart_keyboard,
+    categories_keyboard,
+    checkout_confirm_keyboard,
+    main_menu_keyboard,
+    product_keyboard,
+    products_keyboard,
+    simple_reply_keyboard,
+    skip_cancel_keyboard,
+)
+
+__all__ = [
+    "admin_edit_fields_keyboard",
+    "admin_menu_keyboard",
+    "admin_order_keyboard",
+    "admin_orders_keyboard",
+    "admin_product_actions_keyboard",
+    "admin_products_keyboard",
+    "cart_keyboard",
+    "categories_keyboard",
+    "category_picker_keyboard",
+    "checkout_confirm_keyboard",
+    "confirm_delete_keyboard",
+    "main_menu_keyboard",
+    "product_keyboard",
+    "products_keyboard",
+    "simple_reply_keyboard",
+    "skip_cancel_keyboard",
+    "stock_status_keyboard",
+    "yes_no_keyboard",
+]

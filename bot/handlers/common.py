@@ -1,0 +1,49 @@
+﻿from __future__ import annotations
+
+from aiogram import F, Router
+from aiogram.filters import Command, CommandStart
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message
+
+from bot.const import MAIN_MENU_BUTTON
+from bot.keyboards.user import main_menu_keyboard
+
+
+def get_common_router(admin_id: int) -> Router:
+    router = Router(name="common")
+
+    @router.message(CommandStart())
+    async def cmd_start(message: Message) -> None:
+        is_admin = message.from_user.id == admin_id
+        text = (
+            "Привет. Это универсальный Telegram-магазин.\n\n"
+            "Сейчас бот умеет показывать каталог, складывать товары в корзину, "
+            "оформлять заказы и передавать их админу.\n"
+            "Оплата в MVP предполагается только криптовалютой."
+        )
+        await message.answer(text, reply_markup=main_menu_keyboard(is_admin=is_admin))
+
+    @router.message(Command("cancel"))
+    @router.message(F.text == "Отмена")
+    async def cancel_action(message: Message, state: FSMContext) -> None:
+        current_state = await state.get_state()
+        if current_state:
+            await state.clear()
+            await message.answer(
+                "Текущее действие отменено.",
+                reply_markup=main_menu_keyboard(is_admin=message.from_user.id == admin_id),
+            )
+        else:
+            await message.answer(
+                "Сейчас нет активного сценария.",
+                reply_markup=main_menu_keyboard(is_admin=message.from_user.id == admin_id),
+            )
+
+    @router.message(F.text == MAIN_MENU_BUTTON)
+    async def show_main_menu(message: Message) -> None:
+        await message.answer(
+            "Главное меню.",
+            reply_markup=main_menu_keyboard(is_admin=message.from_user.id == admin_id),
+        )
+
+    return router
