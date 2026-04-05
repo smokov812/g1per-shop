@@ -796,6 +796,7 @@ def get_admin_router(admin_id: int) -> Router:
                 order_id=order.id,
                 admin_id=config.admin_id,
                 include_preorder=True,
+                manager_username=config.order_manager_username,
             )
         except Exception:
             delivered = False
@@ -833,12 +834,9 @@ def get_admin_router(admin_id: int) -> Router:
             return
 
         document = message.document
-        caption = f"Заказ #{order.id}"
-        if document.file_name:
-            caption += f"\n{escape(document.file_name)}"
 
         try:
-            await bot.send_document(order.user_id, document.file_id, caption=caption)
+            await bot.send_document(order.user_id, document.file_id, caption=f"Заказ #{order.id}")
             async with session_maker() as session:
                 updated_order = await OrderRepository(session).mark_preorder_delivery_sent(order.id)
         except Exception:
@@ -893,11 +891,15 @@ def get_admin_router(admin_id: int) -> Router:
 
         if status in {"paid", "completed"}:
             try:
-                await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=order.id, admin_id=config.admin_id, include_preorder=False)
+                await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=order.id, admin_id=config.admin_id, include_preorder=False, manager_username=config.order_manager_username)
             except Exception:
                 pass
 
     return router
+
+
+
+
 
 
 

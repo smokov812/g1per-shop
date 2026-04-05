@@ -135,7 +135,7 @@ async def payment_sync_worker(*, bot: Bot, config: Config, session_maker, paymen
                     if result.order and not result.duplicate and result.current_status != result.previous_status:
                         await notify_payment_update(bot=bot, config=config, order=result.order)
                         if result.current_status in {"paid", "completed"}:
-                            await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=result.order.id, admin_id=config.admin_id)
+                            await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=result.order.id, admin_id=config.admin_id, manager_username=config.order_manager_username)
 
             await asyncio.sleep(config.payment_sync_interval_seconds)
     except asyncio.CancelledError:
@@ -194,5 +194,6 @@ async def run_polling() -> None:
             await webhook_runner.cleanup()
         await bot.session.close()
         await engine.dispose()
+
 
 

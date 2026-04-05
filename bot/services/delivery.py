@@ -14,6 +14,7 @@ async def deliver_order_digital_content(
     order_id: int,
     admin_id: int | None = None,
     include_preorder: bool = False,
+    manager_username: str | None = None,
 ) -> bool:
     async with session_maker() as session:
         order = await OrderRepository(session).get(order_id)
@@ -97,10 +98,7 @@ async def deliver_order_digital_content(
         delivery_completed = True
 
     for file in pending_files:
-        caption = f"Заказ #{order.id}"
-        if file.file_name:
-            caption += f"\n{escape(file.file_name)}"
-        await bot.send_document(order.user_id, file.telegram_file_id, caption=caption)
+        await bot.send_document(order.user_id, file.telegram_file_id, caption=f"Заказ #{order.id}")
         async with session_maker() as session:
             await DeliveryFileRepository(session).mark_delivered([file.id])
 
@@ -111,6 +109,28 @@ async def deliver_order_digital_content(
             order.user_id,
             f"<b>{escape(item.title)}</b>\n\n{escape(item.delivery_content or '')}",
         )
+
+    normalized_manager = (manager_username or "").strip()
+    if normalized_manager and not normalized_manager.startswith("@"):
+        normalized_manager = f"@{normalized_manager}"
+
+    preorder_instruction_sent = False
+    if preorder_items and normalized_manager:
+        for item in preorder_items:
+            if not item.delivery_content:
+                continue
+            user_text = (
+                f"<b>Заказ #{order.id} оплачен.</b>\n\n"
+                f"Позиция <b>{escape(item.title)}</b> оформлена как <b>вход по коду</b>.\n"
+                f"Менеджер: <b>{escape(normalized_manager)}</b>\n\n"
+                "Отправьте менеджеру этот шаблон сообщения:\n"
+                f"<code>{escape(item.delivery_content)}</code>"
+            )
+            try:
+                await bot.send_message(order.user_id, user_text)
+                preorder_instruction_sent = True
+            except Exception:
+                pass
 
     if preorder_items and admin_id:
         preorder_titles = ", ".join(escape(item.title) for item in preorder_items)
@@ -125,10 +145,12 @@ async def deliver_order_digital_content(
         except Exception:
             pass
 
-    if not delivery_completed:
+    if not delivery_completed and not preorder_instruction_sent:
         return False
 
-    async with session_maker() as session:
-        updated_order = await OrderRepository(session).mark_delivery_sent(order_id)
+    if delivery_completed:
+        async with session_maker() as session:
+            updated_order = await OrderRepository(session).mark_delivery_sent(order_id)
+        return updated_order is not None
 
-    return updated_order is not None
+    return True

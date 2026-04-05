@@ -78,6 +78,7 @@ class Config:
     payment_sync_batch_size: int
     message_rate_limit_seconds: float
     callback_rate_limit_seconds: float
+    order_manager_username: str
 
     @property
     def database_backend(self) -> str:
@@ -116,6 +117,7 @@ def load_config() -> Config:
     lzt_market_currency = os.getenv("LZT_MARKET_CURRENCY", currency).strip() or currency
     lzt_market_success_url = os.getenv("LZT_MARKET_SUCCESS_URL", "").strip()
     lzt_market_webhook_url = os.getenv("LZT_MARKET_WEBHOOK_URL", "").strip()
+    order_manager_username = os.getenv("ORDER_MANAGER_USERNAME", "").strip()
     payment_message = os.getenv(
         "PAYMENT_MESSAGE",
         "Оплата принимается только криптовалютой. После оформления админ пришлет реквизиты.",
@@ -168,6 +170,7 @@ def load_config() -> Config:
         payment_sync_batch_size=_env_int("PAYMENT_SYNC_BATCH_SIZE", 20),
         message_rate_limit_seconds=_env_float("MESSAGE_RATE_LIMIT_SECONDS", 0.8),
         callback_rate_limit_seconds=_env_float("CALLBACK_RATE_LIMIT_SECONDS", 0.4),
+        order_manager_username=order_manager_username,
     )
 
 
@@ -188,4 +191,7 @@ def _normalize_payment_providers(providers: tuple[str, ...]) -> tuple[str, ...]:
     if not normalized:
         normalized.append("manual_crypto")
     return tuple(normalized)
+
+
+
 
