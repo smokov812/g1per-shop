@@ -14,6 +14,10 @@ class CreateCategoryStates(StatesGroup):
     description = State()
 
 
+class EditCategoryStates(StatesGroup):
+    title = State()
+
+
 class CreateProductStates(StatesGroup):
     title = State()
     short_description = State()
@@ -31,4 +35,3 @@ class EditProductStates(StatesGroup):
     value = State()
     image = State()
     delivery_files = State()
-

@@ -9,6 +9,7 @@ from bot.const import ORDER_STATUS_LABELS, STOCK_STATUS_LABELS
 def admin_menu_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="Создать категорию", callback_data="admin:create_category")
+    builder.button(text="Список категорий", callback_data="admin:categories")
     builder.button(text="Добавить товар", callback_data="admin:add_product")
     builder.button(text="Список товаров", callback_data="admin:products")
     builder.button(text="Список заказов", callback_data="admin:orders")
@@ -22,6 +23,24 @@ def category_picker_keyboard(categories, prefix: str, include_empty: bool = Fals
         builder.button(text=category.title, callback_data=f"{prefix}:{category.id}")
     if include_empty:
         builder.button(text="Без категории", callback_data=f"{prefix}:none")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def admin_categories_keyboard(categories) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for category in categories:
+        builder.button(text=category.title, callback_data=f"admin:category:{category.id}")
+    builder.button(text="К админ-панели", callback_data="admin:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def admin_category_actions_keyboard(category_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Переименовать", callback_data=f"admin:category_rename:{category_id}")
+    builder.button(text="Удалить", callback_data=f"admin:category_delete:{category_id}")
+    builder.button(text="К списку категорий", callback_data="admin:categories")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -111,4 +130,3 @@ def admin_order_keyboard(order_id: int) -> InlineKeyboardMarkup:
     builder.button(text="К списку заказов", callback_data="admin:orders")
     builder.adjust(1)
     return builder.as_markup()
-

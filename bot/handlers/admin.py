@@ -20,6 +20,8 @@ from bot.const import (
 from bot.db.repositories import AdminAuditLogRepository, CategoryRepository, DeliveryFileRepository, OrderRepository, ProductRepository
 from bot.filters import AdminFilter
 from bot.keyboards.admin import (
+    admin_categories_keyboard,
+    admin_category_actions_keyboard,
     admin_edit_fields_keyboard,
     admin_menu_keyboard,
     admin_order_keyboard,
@@ -33,7 +35,7 @@ from bot.keyboards.admin import (
 )
 from bot.keyboards.user import main_menu_keyboard, simple_reply_keyboard, skip_cancel_keyboard
 from bot.services import deliver_order_digital_content
-from bot.states import CreateCategoryStates, CreateProductStates, EditProductStates
+from bot.states import CreateCategoryStates, CreateProductStates, EditCategoryStates, EditProductStates
 from bot.texts import admin_product_caption, order_text
 from bot.validators import ValidationError, validate_optional_text, validate_price, validate_required_text, validate_sku
 
@@ -67,6 +69,16 @@ def get_admin_router(admin_id: int) -> Router:
     async def show_admin_panel(message: Message) -> None:
         await message.answer("Админ-панель:", reply_markup=admin_menu_keyboard())
 
+    async def show_categories(target_message: Message, session_maker: async_sessionmaker) -> None:
+        async with session_maker() as session:
+            categories = await CategoryRepository(session).list_all()
+
+        if not categories:
+            await target_message.answer("Категории еще не созданы.")
+            return
+
+        await target_message.answer("Список категорий:", reply_markup=admin_categories_keyboard(categories))
+
     async def show_products(target_message: Message, session_maker: async_sessionmaker) -> None:
         async with session_maker() as session:
             products = await ProductRepository(session).list_all()
@@ -92,6 +104,11 @@ def get_admin_router(admin_id: int) -> Router:
     async def admin_panel_entry(message: Message) -> None:
         await show_admin_panel(message)
 
+    @router.callback_query(F.data == "admin:menu")
+    async def admin_panel_callback(call: CallbackQuery) -> None:
+        await call.answer()
+        await show_admin_panel(call.message)
+
     @router.message(Command("products"))
     async def admin_products_command(message: Message, session_maker: async_sessionmaker) -> None:
         await show_products(message, session_maker)
@@ -99,6 +116,11 @@ def get_admin_router(admin_id: int) -> Router:
     @router.message(Command("orders"))
     async def admin_orders_command(message: Message, session_maker: async_sessionmaker, config: Config) -> None:
         await show_orders(message, session_maker, config.currency)
+
+    @router.callback_query(F.data == "admin:categories")
+    async def admin_categories_callback(call: CallbackQuery, session_maker: async_sessionmaker) -> None:
+        await call.answer()
+        await show_categories(call.message, session_maker)
 
     @router.callback_query(F.data == "admin:products")
     async def admin_products_callback(call: CallbackQuery, session_maker: async_sessionmaker) -> None:
@@ -161,6 +183,87 @@ def get_admin_router(admin_id: int) -> Router:
         )
         await show_admin_panel(message)
 
+    @router.callback_query(F.data.startswith("admin:category:"))
+    async def open_admin_category(call: CallbackQuery, session_maker: async_sessionmaker) -> None:
+        category_id = int(call.data.rsplit(":", 1)[-1])
+        async with session_maker() as session:
+            category = await CategoryRepository(session).get(category_id)
+            products = await ProductRepository(session).list_by_category(category_id, only_active=False)
+
+        await call.answer()
+        if not category:
+            await call.message.answer("Категория не найдена.")
+            return
+
+        description = escape(category.description) if category.description else "без описания"
+        text = (
+            f"<b>Категория #{category.id}</b>\n"
+            f"<b>Название:</b> {escape(category.title)}\n"
+            f"<b>Описание:</b> {description}\n"
+            f"<b>Товаров:</b> {len(products)}"
+        )
+        await call.message.answer(text, reply_markup=admin_category_actions_keyboard(category.id))
+
+    @router.callback_query(F.data.startswith("admin:category_rename:"))
+    async def rename_category_start(call: CallbackQuery, state: FSMContext) -> None:
+        category_id = int(call.data.rsplit(":", 1)[-1])
+        await state.clear()
+        await state.set_state(EditCategoryStates.title)
+        await state.update_data(category_id=category_id)
+        await call.answer()
+        await call.message.answer("Введите новое название категории.", reply_markup=simple_reply_keyboard(CANCEL_BUTTON))
+
+    @router.message(EditCategoryStates.title, F.text)
+    async def rename_category_finish(message: Message, state: FSMContext, session_maker: async_sessionmaker, config: Config) -> None:
+        data = await state.get_data()
+        try:
+            title = validate_required_text(message.text, "Название категории", 120)
+        except ValidationError as exc:
+            await message.answer(str(exc))
+            return
+
+        async with session_maker() as session:
+            category = await CategoryRepository(session).update(data["category_id"], title=title)
+
+        if not category:
+            await message.answer("Не удалось обновить категорию. Возможно, такое название уже занято.")
+            return
+
+        await log_admin_action(
+            session_maker,
+            admin_id=message.from_user.id,
+            action="category_update",
+            entity_type="category",
+            entity_id=category.id,
+            payload={"title": category.title},
+        )
+
+        await state.clear()
+        await message.answer(
+            f"Категория <b>{escape(category.title)}</b> обновлена.",
+            reply_markup=main_menu_keyboard(is_admin=message.from_user.id == config.admin_id),
+        )
+        await show_categories(message, session_maker)
+
+    @router.callback_query(F.data.startswith("admin:category_delete:"))
+    async def delete_category(call: CallbackQuery, session_maker: async_sessionmaker) -> None:
+        category_id = int(call.data.rsplit(":", 1)[-1])
+        async with session_maker() as session:
+            deleted = await CategoryRepository(session).delete(category_id)
+
+        await call.answer("Категория удалена." if deleted else "Категория не найдена.", show_alert=not deleted)
+        if not deleted:
+            return
+
+        await log_admin_action(
+            session_maker,
+            admin_id=call.from_user.id,
+            action="category_delete",
+            entity_type="category",
+            entity_id=category_id,
+        )
+        await call.message.answer("Категория удалена. Товары сохранены и отвязаны от категории.")
+        await show_categories(call.message, session_maker)
     @router.callback_query(F.data == "admin:add_product")
     async def add_product_start(call: CallbackQuery, state: FSMContext) -> None:
         await state.clear()
@@ -694,6 +797,12 @@ def get_admin_router(admin_id: int) -> Router:
                 pass
 
     return router
+
+
+
+
+
+
 
 
 

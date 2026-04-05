@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update as sql_update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -64,6 +64,39 @@ class CategoryRepository:
             return None
         await self.session.refresh(category)
         return category
+
+    async def update(self, category_id: int, *, title: str | None = None, description: str | None = None) -> Category | None:
+        category = await self.get(category_id)
+        if not category:
+            return None
+
+        if title is not None:
+            category.title = title.strip()
+        if description is not None:
+            category.description = description or None
+
+        try:
+            await self.session.commit()
+        except IntegrityError:
+            await self.session.rollback()
+            return None
+
+        await self.session.refresh(category)
+        return category
+
+    async def delete(self, category_id: int) -> bool:
+        category = await self.get(category_id)
+        if not category:
+            return False
+
+        await self.session.execute(
+            sql_update(Product)
+            .where(Product.category_id == category_id)
+            .values(category_id=None)
+        )
+        await self.session.delete(category)
+        await self.session.commit()
+        return True
 
 
 class ProductRepository:
@@ -734,4 +767,5 @@ def _parse_order_id(value) -> int | None:
     if raw and raw.isdigit():
         return int(raw)
     return None
+
 
