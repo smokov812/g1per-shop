@@ -1,12 +1,16 @@
 ﻿from __future__ import annotations
 
+from pathlib import Path
+
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import FSInputFile, Message
 
 from bot.const import MAIN_MENU_BUTTON
 from bot.keyboards.user import main_menu_keyboard
+
+BANNER_PATH = Path(__file__).resolve().parents[2] / "banner.png"
 
 
 def get_common_router(admin_id: int) -> Router:
@@ -17,11 +21,13 @@ def get_common_router(admin_id: int) -> Router:
         is_admin = message.from_user.id == admin_id
         text = (
             "Привет. Это универсальный Telegram-магазин.\n\n"
-            "Сейчас бот умеет показывать каталог, складывать товары в корзину, "
-            "оформлять заказы и передавать их админу.\n"
-            "Оплата в MVP предполагается только криптовалютой."
+            "Бот умеет показывать каталог, добавлять товары в корзину, "
+            "оформлять заказы и принимать оплату через подключенные способы."
         )
-        await message.answer(text, reply_markup=main_menu_keyboard(is_admin=is_admin))
+        if BANNER_PATH.exists():
+            await message.answer_photo(FSInputFile(BANNER_PATH), caption=text, reply_markup=main_menu_keyboard(is_admin=is_admin))
+        else:
+            await message.answer(text, reply_markup=main_menu_keyboard(is_admin=is_admin))
 
     @router.message(Command("cancel"))
     @router.message(F.text == "Отмена")
