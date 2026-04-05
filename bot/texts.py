@@ -100,7 +100,7 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
     if order.paid_at:
         lines.append(f"<b>Оплачен:</b> {order.paid_at.strftime('%Y-%m-%d %H:%M')}")
     if getattr(order, "delivery_sent_at", None):
-        lines.append(f"<b>Автовыдача:</b> {order.delivery_sent_at.strftime('%Y-%m-%d %H:%M')}")
+        lines.append(f"<b>Выдача:</b> {order.delivery_sent_at.strftime('%Y-%m-%d %H:%M')}")
 
     if include_customer:
         username = f"@{order.username}" if order.username else "не указан"
@@ -117,6 +117,7 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
     lines.extend(["", "<b>Состав заказа:</b>"])
     for item in order.items:
         subtotal = item.price * item.quantity
-        lines.append(f"- {escape(item.title)} x {item.quantity} = {format_price(subtotal, currency)}")
+        suffix = " (под заказ)" if getattr(item, "stock_status", None) == "preorder" else ""
+        lines.append(f"- {escape(item.title)}{suffix} x {item.quantity} = {format_price(subtotal, currency)}")
 
     return "\n".join(lines)

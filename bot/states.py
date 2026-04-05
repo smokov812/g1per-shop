@@ -35,3 +35,7 @@ class EditProductStates(StatesGroup):
     value = State()
     image = State()
     delivery_files = State()
+
+
+class ManualOrderDeliveryStates(StatesGroup):
+    document = State()

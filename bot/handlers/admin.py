@@ -35,7 +35,7 @@ from bot.keyboards.admin import (
 )
 from bot.keyboards.user import main_menu_keyboard, simple_reply_keyboard, skip_cancel_keyboard
 from bot.services import deliver_order_digital_content
-from bot.states import CreateCategoryStates, CreateProductStates, EditCategoryStates, EditProductStates
+from bot.states import CreateCategoryStates, CreateProductStates, EditCategoryStates, EditProductStates, ManualOrderDeliveryStates
 from bot.texts import admin_product_caption, order_text
 from bot.validators import ValidationError, validate_optional_text, validate_price, validate_required_text, validate_sku
 
@@ -762,13 +762,26 @@ def get_admin_router(admin_id: int) -> Router:
         await call.message.answer(order_text(order, config.currency, include_customer=True), reply_markup=admin_order_keyboard(order.id))
 
     @router.callback_query(F.data.startswith("admin:order_deliver:"))
-    async def manual_deliver_order(call: CallbackQuery, session_maker: async_sessionmaker, config: Config, bot: Bot) -> None:
+    async def manual_deliver_order(call: CallbackQuery, state: FSMContext, session_maker: async_sessionmaker, config: Config, bot: Bot) -> None:
         order_id = int(call.data.rsplit(":", 1)[-1])
         async with session_maker() as session:
             order = await OrderRepository(session).get(order_id)
 
         if not order:
             await call.answer("Заказ не найден.", show_alert=True)
+            return
+
+        has_preorder_items = any(item.stock_status == "preorder" for item in order.items)
+        if has_preorder_items:
+            if order.delivery_sent_at:
+                await call.answer("Выдача уже выполнена.", show_alert=True)
+                return
+
+            await state.clear()
+            await state.set_state(ManualOrderDeliveryStates.document)
+            await state.update_data(order_id=order.id)
+            await call.answer()
+            await call.message.answer("Отправьте файл документом, и я выдам его покупателю по этому заказу.", reply_markup=simple_reply_keyboard(CANCEL_BUTTON))
             return
 
         try:
@@ -797,6 +810,53 @@ def get_admin_router(admin_id: int) -> Router:
         else:
             await call.answer("Выдача не выполнена.", show_alert=True)
             await call.message.answer("Не удалось выполнить выдачу. Проверьте ZIP-пул, статус заказа и наличие уже отправленной выдачи.")
+    @router.message(ManualOrderDeliveryStates.document, F.document)
+    async def send_manual_order_document(message: Message, state: FSMContext, session_maker: async_sessionmaker, config: Config, bot: Bot) -> None:
+        data = await state.get_data()
+        order_id = data.get("order_id")
+        if not order_id:
+            await state.clear()
+            await message.answer("Не удалось определить заказ для выдачи.")
+            return
+
+        async with session_maker() as session:
+            order = await OrderRepository(session).get(order_id)
+
+        if not order:
+            await state.clear()
+            await message.answer("Заказ не найден.")
+            return
+
+        document = message.document
+        caption = f"Заказ #{order.id}"
+        if document.file_name:
+            caption += f"\n{escape(document.file_name)}"
+
+        try:
+            await bot.send_document(order.user_id, document.file_id, caption=caption)
+            async with session_maker() as session:
+                updated_order = await OrderRepository(session).mark_delivery_sent(order.id)
+        except Exception:
+            await message.answer("Не удалось отправить файл покупателю.")
+            return
+
+        await log_admin_action(
+            session_maker,
+            admin_id=message.from_user.id,
+            action="order_manual_delivery_upload",
+            entity_type="order",
+            entity_id=order.id,
+            payload={"file_name": document.file_name or None},
+        )
+
+        await state.clear()
+        await message.answer("Файл отправлен покупателю.", reply_markup=main_menu_keyboard(is_admin=message.from_user.id == config.admin_id))
+        if updated_order:
+            await message.answer(order_text(updated_order, config.currency, include_customer=True), reply_markup=admin_order_keyboard(updated_order.id))
+
+    @router.message(ManualOrderDeliveryStates.document)
+    async def send_manual_order_document_invalid(message: Message) -> None:
+        await message.answer("Отправьте файл документом или нажмите «Отмена».")
     @router.callback_query(F.data.startswith("admin:order_status:"))
     async def update_order_status(call: CallbackQuery, session_maker: async_sessionmaker, config: Config, bot: Bot) -> None:
         _, _, order_id_raw, status = call.data.split(":")
@@ -833,6 +893,7 @@ def get_admin_router(admin_id: int) -> Router:
                 pass
 
     return router
+
 
 
 
