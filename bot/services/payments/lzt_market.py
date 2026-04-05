@@ -45,10 +45,21 @@ class LztMarketPaymentService(BasePaymentService):
         response = await asyncio.to_thread(self._request_sync, method="POST", url=self.invoice_url, payload=payload)
 
         external_id = self._string(response.get("invoice_id") or response.get("id") or response.get("payment_id") or payload["payment_id"])
-        payment_url = self._string(response.get("url") or response.get("payment_url") or response.get("link"))
-        status = self._string(response.get("status")) or "created"
-        amount = Decimal(str(response.get("amount") or context.amount))
-        currency = self._string(response.get("currency")) or self.config.lzt_market_currency
+        payment_url = self._extract_payment_url(response)
+
+        invoice_details = None
+        if not payment_url:
+            try:
+                invoice_details = await self.fetch_payment_status(external_payment_id=external_id, order_id=context.order_id)
+            except Exception:
+                invoice_details = None
+            if invoice_details:
+                payment_url = self._extract_payment_url(invoice_details)
+
+        invoice_data = invoice_details or response
+        status = self._string(invoice_data.get("status")) or "created"
+        amount = Decimal(str(invoice_data.get("amount") or context.amount))
+        currency = self._string(invoice_data.get("currency")) or self.config.lzt_market_currency
 
         lines = [
             f"<b>Заказ #{context.order_id} создан.</b>",
@@ -58,6 +69,8 @@ class LztMarketPaymentService(BasePaymentService):
         ]
         if payment_url:
             lines.extend(["", f"Ссылка на оплату:\n{payment_url}"])
+        else:
+            lines.extend(["", "Ссылка на оплату не пришла в ответе API. Проверьте merchant в LZT или откройте инвойс из панели вручную."])
         lines.extend(["", "После оплаты бот обновит статус автоматически."])
 
         return PaymentInstructions(
@@ -140,6 +153,39 @@ class LztMarketPaymentService(BasePaymentService):
             return decoded
         raise RuntimeError(f"LZT Market invalid response: {raw}")
 
+    def _extract_payment_url(self, payload: dict | None) -> str | None:
+        if not isinstance(payload, dict):
+            return None
+
+        direct_candidates = (
+            "url",
+            "payment_url",
+            "pay_url",
+            "invoice_url",
+            "link",
+            "redirect_url",
+            "redirect",
+            "payment_link",
+            "invoice_link",
+            "payUrl",
+            "invoiceUrl",
+            "redirectUrl",
+            "paymentLink",
+        )
+        for key in direct_candidates:
+            value = self._string(payload.get(key))
+            if value:
+                return value
+
+        nested_candidates = ("invoice", "payment", "data", "result")
+        for key in nested_candidates:
+            nested = payload.get(key)
+            if isinstance(nested, dict):
+                nested_url = self._extract_payment_url(nested)
+                if nested_url:
+                    return nested_url
+        return None
+
     def _merchant_id_value(self) -> int | str:
         return int(self.config.lzt_market_merchant_id) if self.config.lzt_market_merchant_id.isdigit() else self.config.lzt_market_merchant_id
 
@@ -148,4 +194,5 @@ class LztMarketPaymentService(BasePaymentService):
         if value in (None, ""):
             return None
         return str(value)
+
 
