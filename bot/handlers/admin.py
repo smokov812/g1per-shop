@@ -244,7 +244,7 @@ def get_admin_router(admin_id: int) -> Router:
         await state.update_data(product_id=product_id)
         await call.answer()
         await call.message.answer(
-            "ÐÑÐ¿ÑÐ°Ð²Ð»ÑÐ¹ÑÐµ ZIP-ÑÐ°Ð¹Ð»Ñ Ð¿Ð¾ Ð¾Ð´Ð½Ð¾Ð¼Ñ Ð¸Ð»Ð¸ ÑÑÐ°Ð·Ñ Ð¿Ð°ÑÐºÐ¾Ð¹ Ð½ÐµÑÐºÐ¾Ð»ÑÐºÐ¸Ð¼Ð¸ ÑÐ¾Ð¾Ð±ÑÐµÐ½Ð¸ÑÐ¼Ð¸ Ð¿Ð¾Ð´ÑÑÐ´. ÐÐ¾ÑÐ»Ðµ ÐºÐ¾ÑÐ¾ÑÐºÐ¾Ð¹ Ð¿Ð°ÑÐ·Ñ Ñ Ð¿ÑÐ¸ÑÐ»Ñ Ð¾Ð´Ð½Ñ Ð¾Ð±ÑÑÑ ÑÐ²Ð¾Ð´ÐºÑ. ÐÐ»Ñ ÑÐ¸Ð½ÑÑÐ¾Ð½Ð¸Ð·Ð°ÑÐ¸Ð¸ Ð²Ð°ÑÐ¸Ð°Ð½ÑÐ¾Ð² Ð¸ÑÐ¿Ð¾Ð»ÑÐ·ÑÐ¹ÑÐµ Ð¾Ð´Ð¸Ð½Ð°ÐºÐ¾Ð²ÑÐ¹ Ð¿ÑÐµÑÐ¸ÐºÑ Ð´Ð¾ __, Ð½Ð°Ð¿ÑÐ¸Ð¼ÐµÑ acc001__tdata.zip Ð¸ acc001__session.zip. ÐÐ»Ñ ÑÐ¾Ð²Ð°ÑÐ¾Ð² Ð¿Ð¾Ð´ Ð·Ð°ÐºÐ°Ð· Ð¼Ð¾Ð¶Ð½Ð¾ Ð·Ð°Ð³ÑÑÐ¶Ð°ÑÑ ZIP-Ð·Ð°Ð³Ð»ÑÑÐºÐ¸ ÑÐ¾Ð»ÑÐºÐ¾ Ð´Ð»Ñ ÑÑÐµÑÐ° Ð¾ÑÑÐ°ÑÐºÐ¾Ð².",
+            "Отправляйте ZIP-файлы по одному или сразу пачкой несколькими сообщениями подряд. После короткой паузы я пришлю одну общую сводку. Для синхронизации вариантов используйте одинаковый префикс до __, например acc001__tdata.zip и acc001__session.zip. Для товаров под заказ можно загружать ZIP-заглушки только для учета остатков.",
             reply_markup=simple_reply_keyboard(CANCEL_BUTTON),
         )
 
@@ -274,9 +274,9 @@ def get_admin_router(admin_id: int) -> Router:
                 entity_id=product_id,
                 payload={"delivery_file_id": file_id},
             )
-            await call.answer("ZIP ÑÐ´Ð°Ð»ÐµÐ½.")
+            await call.answer("ZIP удален.")
         else:
-            await call.answer("ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ ÑÐ´Ð°Ð»Ð¸ÑÑ ZIP. ÐÐ¾Ð·Ð¼Ð¾Ð¶Ð½Ð¾, Ð¾Ð½ ÑÐ¶Ðµ Ð·Ð°ÑÐµÐ·ÐµÑÐ²Ð¸ÑÐ¾Ð²Ð°Ð½ Ð¸Ð»Ð¸ Ð²ÑÐ´Ð°Ð½.", show_alert=True)
+            await call.answer("Не удалось удалить ZIP. Возможно, он уже зарезервирован или выдан.", show_alert=True)
 
         await show_delivery_pool_page(call.message, session_maker, product_id, page)
 
@@ -285,7 +285,7 @@ def get_admin_router(admin_id: int) -> Router:
         product_id = int(call.data.rsplit(":", 1)[-1])
         await call.answer()
         await call.message.answer(
-            "ÐÑÐ¸ÑÑÐ¸ÑÑ ÑÐ¾Ð»ÑÐºÐ¾ ÑÐ²Ð¾Ð±Ð¾Ð´Ð½ÑÐµ ZIP Ð² ÑÑÐ¾Ð¼ ÑÐ¾Ð²Ð°ÑÐµ? ÐÐ°ÑÐµÐ·ÐµÑÐ²Ð¸ÑÐ¾Ð²Ð°Ð½Ð½ÑÐµ Ð¸ ÑÐ¶Ðµ Ð²ÑÐ´Ð°Ð½Ð½ÑÐµ ÑÐ°Ð¹Ð»Ñ Ð·Ð°ÑÑÐ¾Ð½ÑÑÑ Ð½Ðµ Ð±ÑÐ´ÑÑ.",
+            "Очистить только свободные ZIP в этом товаре? Зарезервированные и уже выданные файлы затронуты не будут.",
             reply_markup=admin_delivery_pool_clear_keyboard(product_id),
         )
 
@@ -304,7 +304,7 @@ def get_admin_router(admin_id: int) -> Router:
             entity_id=product_id,
             payload={"deleted_count": deleted_count},
         )
-        await call.answer("ZIP-Ð¿ÑÐ» Ð¾ÑÐ¸ÑÐµÐ½." if deleted_count else "Ð¡Ð²Ð¾Ð±Ð¾Ð´Ð½ÑÑ ZIP Ð´Ð»Ñ ÑÐ´Ð°Ð»ÐµÐ½Ð¸Ñ Ð½ÐµÑ.")
+        await call.answer("ZIP-пул очищен." if deleted_count else "Свободных ZIP для удаления нет.")
         await show_delivery_pool_menu(call.message, session_maker, product_id)
 
     @router.callback_query(F.data == "admin:categories")
