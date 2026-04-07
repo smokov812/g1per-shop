@@ -132,6 +132,86 @@ def get_admin_router(admin_id: int) -> Router:
 
         await target_message.answer("Последние заказы:", reply_markup=admin_orders_keyboard(orders, currency))
 
+    async def show_delivery_pool_menu(target_message: Message, session_maker: async_sessionmaker, product_id: int) -> None:
+        async with session_maker() as session:
+            product = await ProductRepository(session).get(product_id)
+            delivery_repo = DeliveryFileRepository(session)
+            total_count = await delivery_repo.count_total(product_id)
+            available_count = await delivery_repo.count_available(product_id)
+
+        if not product:
+            await target_message.answer("????? ?? ??????.")
+            return
+
+        unavailable_count = max(total_count - available_count, 0)
+        await target_message.answer(
+            f"<b>ZIP-??? ??????:</b> {escape(product.title)}\n"
+            f"????? ZIP: <b>{total_count}</b>\n"
+            f"????????: <b>{available_count}</b>\n"
+            f"??????????????? ??? ??????: <b>{unavailable_count}</b>",
+            reply_markup=admin_delivery_pool_keyboard(product_id),
+        )
+
+    async def show_delivery_pool_page(
+        target_message: Message, session_maker: async_sessionmaker, product_id: int, page: int = 1
+    ) -> None:
+        page_size = 10
+        current_page = max(page, 1)
+        offset = (current_page - 1) * page_size
+
+        async with session_maker() as session:
+            product = await ProductRepository(session).get(product_id)
+            delivery_repo = DeliveryFileRepository(session)
+            total_count = await delivery_repo.count_total(product_id)
+            files = await delivery_repo.list_by_product(product_id, limit=page_size, offset=offset)
+
+        if not product:
+            await target_message.answer("????? ?? ??????.")
+            return
+
+        if total_count == 0:
+            await target_message.answer(
+                f"? ?????? <b>{escape(product.title)}</b> ZIP-??? ???? ????.",
+                reply_markup=admin_delivery_pool_keyboard(product_id),
+            )
+            return
+
+        total_pages = max((total_count + page_size - 1) // page_size, 1)
+        if current_page > total_pages:
+            current_page = total_pages
+            offset = (current_page - 1) * page_size
+            async with session_maker() as session:
+                delivery_repo = DeliveryFileRepository(session)
+                files = await delivery_repo.list_by_product(product_id, limit=page_size, offset=offset)
+
+        lines = [
+            f"<b>ZIP-??? ??????:</b> {escape(product.title)}",
+            f"<b>????????:</b> {current_page}/{total_pages}",
+            f"<b>????? ZIP:</b> {total_count}",
+            "",
+        ]
+
+        for delivery_file in files:
+            if delivery_file.delivered_at:
+                status = "?????"
+            elif delivery_file.reserved_order_id is not None:
+                status = f"?????????????? (????? #{delivery_file.reserved_order_id})"
+            else:
+                status = "????????"
+
+            sync_key = delivery_file.sync_key or "-"
+            file_name = delivery_file.file_name or f"file_{delivery_file.id}.zip"
+            lines.append(
+                f"<b>#{delivery_file.id}</b> {escape(file_name)}\n"
+                f"??????: {escape(status)}\n"
+                f"??????????: <code>{escape(sync_key)}</code>"
+            )
+
+        await target_message.answer(
+            "\n\n".join(lines),
+            reply_markup=admin_delivery_pool_files_keyboard(product_id, files, current_page, total_pages),
+        )
+
     @router.message(Command("admin"))
     @router.message(lambda message: button_matches(message.text, ADMIN_PANEL_BUTTON))
     async def admin_panel_entry(message: Message) -> None:
