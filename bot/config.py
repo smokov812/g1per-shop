@@ -41,6 +41,7 @@ def _env_list(name: str, default: str = "") -> tuple[str, ...]:
 class Config:
     bot_token: str
     admin_id: int
+    support_username: str
     database_url: str
     currency: str
     payment_message: str
@@ -96,6 +97,7 @@ def load_config() -> Config:
 
     bot_token = os.getenv("BOT_TOKEN", "").strip()
     admin_id_raw = os.getenv("ADMIN_ID", "").strip()
+    support_username = os.getenv("SUPPORT_USERNAME", "").strip()
     database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///shop.db").strip()
     currency = os.getenv("CURRENCY", "USDT").strip() or "USDT"
     payment_provider = os.getenv("PAYMENT_PROVIDER", "manual_crypto").strip() or "manual_crypto"
@@ -133,6 +135,7 @@ def load_config() -> Config:
     return Config(
         bot_token=bot_token,
         admin_id=int(admin_id_raw),
+        support_username=support_username,
         database_url=database_url,
         currency=currency,
         payment_message=payment_message,
@@ -191,7 +194,3 @@ def _normalize_payment_providers(providers: tuple[str, ...]) -> tuple[str, ...]:
     if not normalized:
         normalized.append("manual_crypto")
     return tuple(normalized)
-
-
-
-

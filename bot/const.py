@@ -20,6 +20,7 @@ class OrderStatus(str, Enum):
 MAIN_MENU_BUTTON = "Главное меню"
 CATALOG_BUTTON = "Каталог"
 CART_BUTTON = "Корзина"
+SUPPORT_BUTTON = "Поддержка"
 ADMIN_PANEL_BUTTON = "Админ-панель"
 SKIP_BUTTON = "Пропустить"
 CANCEL_BUTTON = "Отмена"
@@ -54,8 +55,6 @@ TEXT_PRODUCT_FIELDS = {
     "price": "цену",
     "sku": "SKU",
 }
-
-
 
 
 def button_matches(text: str | None, label: str) -> bool:

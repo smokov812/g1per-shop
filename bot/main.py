@@ -168,7 +168,7 @@ async def run_polling() -> None:
     dispatcher.message.middleware(rate_limit)
     dispatcher.callback_query.middleware(rate_limit)
 
-    dispatcher.include_router(get_common_router(config.admin_id))
+    dispatcher.include_router(get_common_router(config.admin_id, config.support_username))
     dispatcher.include_router(get_user_router())
     dispatcher.include_router(get_admin_router(config.admin_id))
 
@@ -194,6 +194,7 @@ async def run_polling() -> None:
             await webhook_runner.cleanup()
         await bot.session.close()
         await engine.dispose()
+
 
 
 

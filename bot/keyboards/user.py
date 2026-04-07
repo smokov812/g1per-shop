@@ -3,7 +3,7 @@
 from aiogram.types import InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
-from bot.const import ADMIN_PANEL_BUTTON, CANCEL_BUTTON, CART_BUTTON, CATALOG_BUTTON, PAYMENT_PROVIDER_LABELS, SKIP_BUTTON
+from bot.const import ADMIN_PANEL_BUTTON, CANCEL_BUTTON, CART_BUTTON, CATALOG_BUTTON, PAYMENT_PROVIDER_LABELS, SKIP_BUTTON, SUPPORT_BUTTON
 
 
 USER_PAYMENT_LABELS = {
@@ -13,9 +13,11 @@ USER_PAYMENT_LABELS = {
 }
 
 
-def main_menu_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
+def main_menu_keyboard(is_admin: bool = False, has_support: bool = False) -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     builder.row(KeyboardButton(text=f"📚 {CATALOG_BUTTON}"), KeyboardButton(text=f"🛍️ {CART_BUTTON}"))
+    if has_support:
+        builder.row(KeyboardButton(text=f"💬 {SUPPORT_BUTTON}"))
     if is_admin:
         builder.row(KeyboardButton(text=f"🛠️ {ADMIN_PANEL_BUTTON}"))
     return builder.as_markup(resize_keyboard=True)
@@ -111,4 +113,3 @@ def checkout_confirm_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="❌ Отменить", callback_data="user:checkout_cancel")
     builder.adjust(1)
     return builder.as_markup()
-
