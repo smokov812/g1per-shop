@@ -81,17 +81,16 @@ async def _flush_delivery_upload_batch(
 
     files_preview = ", ".join(f"<code>{escape(name)}</code>" for name in batch["files"][:5])
     if len(batch["files"]) > 5:
-        files_preview += f" ? ??? {len(batch['files']) - 5}"
+        files_preview += f" и ещё {len(batch['files']) - 5}"
 
     sync_preview = ", ".join(f"<code>{escape(sync_key)}</code>" for sync_key in sorted(batch["sync_keys"])[:5])
-    sync_text = f"\n???????????: {sync_preview}." if sync_preview else ""
+    sync_text = f"\nСинхроключи: {sync_preview}." if sync_preview else ""
 
     await message.answer(
-        f"? ??? ?????? <b>{escape(product_title)}</b> ????????? ZIP-??????: <b>{batch['count']}</b>.\n"
-        f"?????? ????????: <b>{batch['available_count']}</b>.\n"
-        f"?????: {files_preview}.{sync_text}"
+        f"К товару <b>{escape(product_title)}</b> добавлено ZIP-файлов: <b>{batch['count']}</b>.\n"
+        f"Свободных файлов теперь: <b>{batch['available_count']}</b>.\n"
+        f"Файлы: {files_preview}.{sync_text}"
     )
-
 
 def get_admin_router(admin_id: int) -> Router:
     router = Router(name="admin")
@@ -140,15 +139,15 @@ def get_admin_router(admin_id: int) -> Router:
             available_count = await delivery_repo.count_available(product_id)
 
         if not product:
-            await target_message.answer("????? ?? ??????.")
+            await target_message.answer("Товар не найден.")
             return
 
         unavailable_count = max(total_count - available_count, 0)
         await target_message.answer(
-            f"<b>ZIP-??? ??????:</b> {escape(product.title)}\n"
-            f"????? ZIP: <b>{total_count}</b>\n"
-            f"????????: <b>{available_count}</b>\n"
-            f"??????????????? ??? ??????: <b>{unavailable_count}</b>",
+            f"<b>ZIP-пул товара:</b> {escape(product.title)}\n"
+            f"Всего ZIP: <b>{total_count}</b>\n"
+            f"Свободно: <b>{available_count}</b>\n"
+            f"Зарезервировано или выдано: <b>{unavailable_count}</b>",
             reply_markup=admin_delivery_pool_keyboard(product_id),
         )
 
@@ -166,12 +165,12 @@ def get_admin_router(admin_id: int) -> Router:
             files = await delivery_repo.list_by_product(product_id, limit=page_size, offset=offset)
 
         if not product:
-            await target_message.answer("????? ?? ??????.")
+            await target_message.answer("Товар не найден.")
             return
 
         if total_count == 0:
             await target_message.answer(
-                f"? ?????? <b>{escape(product.title)}</b> ZIP-??? ???? ????.",
+                f"У товара <b>{escape(product.title)}</b> ZIP-пул пока пуст.",
                 reply_markup=admin_delivery_pool_keyboard(product_id),
             )
             return
@@ -185,26 +184,26 @@ def get_admin_router(admin_id: int) -> Router:
                 files = await delivery_repo.list_by_product(product_id, limit=page_size, offset=offset)
 
         lines = [
-            f"<b>ZIP-??? ??????:</b> {escape(product.title)}",
-            f"<b>????????:</b> {current_page}/{total_pages}",
-            f"<b>????? ZIP:</b> {total_count}",
+            f"<b>ZIP-пул товара:</b> {escape(product.title)}",
+            f"<b>Страница:</b> {current_page}/{total_pages}",
+            f"<b>Всего ZIP:</b> {total_count}",
             "",
         ]
 
         for delivery_file in files:
             if delivery_file.delivered_at:
-                status = "?????"
+                status = "выдан"
             elif delivery_file.reserved_order_id is not None:
-                status = f"?????????????? (????? #{delivery_file.reserved_order_id})"
+                status = f"зарезервирован (заказ #{delivery_file.reserved_order_id})"
             else:
-                status = "????????"
+                status = "свободен"
 
             sync_key = delivery_file.sync_key or "-"
             file_name = delivery_file.file_name or f"file_{delivery_file.id}.zip"
             lines.append(
                 f"<b>#{delivery_file.id}</b> {escape(file_name)}\n"
-                f"??????: {escape(status)}\n"
-                f"??????????: <code>{escape(sync_key)}</code>"
+                f"Статус: {escape(status)}\n"
+                f"Синхроключ: <code>{escape(sync_key)}</code>"
             )
 
         await target_message.answer(
@@ -245,7 +244,7 @@ def get_admin_router(admin_id: int) -> Router:
         await state.update_data(product_id=product_id)
         await call.answer()
         await call.message.answer(
-            "??????????? ZIP-????? ?? ?????? ??? ????? ?????? ??????????? ??????????? ??????. ????? ???????? ????? ? ?????? ???? ????? ??????. ??? ????????????? ????????? ??????????? ?????????? ??????? ?? __, ???????? acc001__tdata.zip ? acc001__session.zip. ??? ??????? ??? ????? ????? ????????? ZIP-???????? ?????? ??? ????? ????????.",
+            "ÐÑÐ¿ÑÐ°Ð²Ð»ÑÐ¹ÑÐµ ZIP-ÑÐ°Ð¹Ð»Ñ Ð¿Ð¾ Ð¾Ð´Ð½Ð¾Ð¼Ñ Ð¸Ð»Ð¸ ÑÑÐ°Ð·Ñ Ð¿Ð°ÑÐºÐ¾Ð¹ Ð½ÐµÑÐºÐ¾Ð»ÑÐºÐ¸Ð¼Ð¸ ÑÐ¾Ð¾Ð±ÑÐµÐ½Ð¸ÑÐ¼Ð¸ Ð¿Ð¾Ð´ÑÑÐ´. ÐÐ¾ÑÐ»Ðµ ÐºÐ¾ÑÐ¾ÑÐºÐ¾Ð¹ Ð¿Ð°ÑÐ·Ñ Ñ Ð¿ÑÐ¸ÑÐ»Ñ Ð¾Ð´Ð½Ñ Ð¾Ð±ÑÑÑ ÑÐ²Ð¾Ð´ÐºÑ. ÐÐ»Ñ ÑÐ¸Ð½ÑÑÐ¾Ð½Ð¸Ð·Ð°ÑÐ¸Ð¸ Ð²Ð°ÑÐ¸Ð°Ð½ÑÐ¾Ð² Ð¸ÑÐ¿Ð¾Ð»ÑÐ·ÑÐ¹ÑÐµ Ð¾Ð´Ð¸Ð½Ð°ÐºÐ¾Ð²ÑÐ¹ Ð¿ÑÐµÑÐ¸ÐºÑ Ð´Ð¾ __, Ð½Ð°Ð¿ÑÐ¸Ð¼ÐµÑ acc001__tdata.zip Ð¸ acc001__session.zip. ÐÐ»Ñ ÑÐ¾Ð²Ð°ÑÐ¾Ð² Ð¿Ð¾Ð´ Ð·Ð°ÐºÐ°Ð· Ð¼Ð¾Ð¶Ð½Ð¾ Ð·Ð°Ð³ÑÑÐ¶Ð°ÑÑ ZIP-Ð·Ð°Ð³Ð»ÑÑÐºÐ¸ ÑÐ¾Ð»ÑÐºÐ¾ Ð´Ð»Ñ ÑÑÐµÑÐ° Ð¾ÑÑÐ°ÑÐºÐ¾Ð².",
             reply_markup=simple_reply_keyboard(CANCEL_BUTTON),
         )
 
@@ -275,9 +274,9 @@ def get_admin_router(admin_id: int) -> Router:
                 entity_id=product_id,
                 payload={"delivery_file_id": file_id},
             )
-            await call.answer("ZIP ??????.")
+            await call.answer("ZIP ÑÐ´Ð°Ð»ÐµÐ½.")
         else:
-            await call.answer("?? ??????? ??????? ZIP. ????????, ?? ??? ?????????????? ??? ?????.", show_alert=True)
+            await call.answer("ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ ÑÐ´Ð°Ð»Ð¸ÑÑ ZIP. ÐÐ¾Ð·Ð¼Ð¾Ð¶Ð½Ð¾, Ð¾Ð½ ÑÐ¶Ðµ Ð·Ð°ÑÐµÐ·ÐµÑÐ²Ð¸ÑÐ¾Ð²Ð°Ð½ Ð¸Ð»Ð¸ Ð²ÑÐ´Ð°Ð½.", show_alert=True)
 
         await show_delivery_pool_page(call.message, session_maker, product_id, page)
 
@@ -286,7 +285,7 @@ def get_admin_router(admin_id: int) -> Router:
         product_id = int(call.data.rsplit(":", 1)[-1])
         await call.answer()
         await call.message.answer(
-            "???????? ?????? ????????? ZIP ? ???? ????? ????????????????? ? ??? ???????? ????? ??????? ?? ?????.",
+            "ÐÑÐ¸ÑÑÐ¸ÑÑ ÑÐ¾Ð»ÑÐºÐ¾ ÑÐ²Ð¾Ð±Ð¾Ð´Ð½ÑÐµ ZIP Ð² ÑÑÐ¾Ð¼ ÑÐ¾Ð²Ð°ÑÐµ? ÐÐ°ÑÐµÐ·ÐµÑÐ²Ð¸ÑÐ¾Ð²Ð°Ð½Ð½ÑÐµ Ð¸ ÑÐ¶Ðµ Ð²ÑÐ´Ð°Ð½Ð½ÑÐµ ÑÐ°Ð¹Ð»Ñ Ð·Ð°ÑÑÐ¾Ð½ÑÑÑ Ð½Ðµ Ð±ÑÐ´ÑÑ.",
             reply_markup=admin_delivery_pool_clear_keyboard(product_id),
         )
 
@@ -305,7 +304,7 @@ def get_admin_router(admin_id: int) -> Router:
             entity_id=product_id,
             payload={"deleted_count": deleted_count},
         )
-        await call.answer("??? ??????." if deleted_count else "????????? ZIP ??? ???????? ???.")
+        await call.answer("ZIP-Ð¿ÑÐ» Ð¾ÑÐ¸ÑÐµÐ½." if deleted_count else "Ð¡Ð²Ð¾Ð±Ð¾Ð´Ð½ÑÑ ZIP Ð´Ð»Ñ ÑÐ´Ð°Ð»ÐµÐ½Ð¸Ñ Ð½ÐµÑ.")
         await show_delivery_pool_menu(call.message, session_maker, product_id)
 
     @router.callback_query(F.data == "admin:categories")
