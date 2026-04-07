@@ -24,6 +24,9 @@ from bot.filters import AdminFilter
 from bot.keyboards.admin import (
     admin_categories_keyboard,
     admin_category_actions_keyboard,
+    admin_delivery_pool_clear_keyboard,
+    admin_delivery_pool_files_keyboard,
+    admin_delivery_pool_keyboard,
     admin_edit_fields_keyboard,
     admin_menu_keyboard,
     admin_order_keyboard,
@@ -146,6 +149,84 @@ def get_admin_router(admin_id: int) -> Router:
     @router.message(Command("orders"))
     async def admin_orders_command(message: Message, session_maker: async_sessionmaker, config: Config) -> None:
         await show_orders(message, session_maker, config.currency)
+
+
+    @router.callback_query(F.data.startswith("admin:delivery_pool:"))
+    async def open_delivery_pool(call: CallbackQuery, session_maker: async_sessionmaker) -> None:
+        product_id = int(call.data.rsplit(":", 1)[-1])
+        await call.answer()
+        await show_delivery_pool_menu(call.message, session_maker, product_id)
+
+    @router.callback_query(F.data.startswith("admin:delivery_pool_upload:"))
+    async def delivery_pool_upload_start(call: CallbackQuery, state: FSMContext) -> None:
+        product_id = int(call.data.rsplit(":", 1)[-1])
+        await state.clear()
+        await state.set_state(EditProductStates.delivery_files)
+        await state.update_data(product_id=product_id)
+        await call.answer()
+        await call.message.answer(
+            "??????????? ZIP-????? ?? ?????? ??? ????? ?????? ??????????? ??????????? ??????. ????? ???????? ????? ? ?????? ???? ????? ??????. ??? ????????????? ????????? ??????????? ?????????? ??????? ?? __, ???????? acc001__tdata.zip ? acc001__session.zip. ??? ??????? ??? ????? ????? ????????? ZIP-???????? ?????? ??? ????? ????????.",
+            reply_markup=simple_reply_keyboard(CANCEL_BUTTON),
+        )
+
+    @router.callback_query(F.data.startswith("admin:delivery_pool_view:"))
+    async def delivery_pool_view(call: CallbackQuery, session_maker: async_sessionmaker) -> None:
+        _, _, product_id_raw, page_raw = call.data.split(":")
+        await call.answer()
+        await show_delivery_pool_page(call.message, session_maker, int(product_id_raw), int(page_raw))
+
+    @router.callback_query(F.data.startswith("admin:delivery_pool_delete:"))
+    async def delivery_pool_delete(call: CallbackQuery, session_maker: async_sessionmaker) -> None:
+        _, _, product_id_raw, file_id_raw, page_raw = call.data.split(":")
+        product_id = int(product_id_raw)
+        file_id = int(file_id_raw)
+        page = int(page_raw)
+
+        async with session_maker() as session:
+            delivery_repo = DeliveryFileRepository(session)
+            deleted = await delivery_repo.delete_file(product_id=product_id, delivery_file_id=file_id)
+
+        if deleted:
+            await log_admin_action(
+                session_maker,
+                admin_id=call.from_user.id,
+                action="product_delete_delivery_zip",
+                entity_type="product",
+                entity_id=product_id,
+                payload={"delivery_file_id": file_id},
+            )
+            await call.answer("ZIP ??????.")
+        else:
+            await call.answer("?? ??????? ??????? ZIP. ????????, ?? ??? ?????????????? ??? ?????.", show_alert=True)
+
+        await show_delivery_pool_page(call.message, session_maker, product_id, page)
+
+    @router.callback_query(F.data.startswith("admin:delivery_pool_clear_confirm:"))
+    async def delivery_pool_clear_confirm(call: CallbackQuery) -> None:
+        product_id = int(call.data.rsplit(":", 1)[-1])
+        await call.answer()
+        await call.message.answer(
+            "???????? ?????? ????????? ZIP ? ???? ????? ????????????????? ? ??? ???????? ????? ??????? ?? ?????.",
+            reply_markup=admin_delivery_pool_clear_keyboard(product_id),
+        )
+
+    @router.callback_query(F.data.startswith("admin:delivery_pool_clear:"))
+    async def delivery_pool_clear(call: CallbackQuery, session_maker: async_sessionmaker) -> None:
+        product_id = int(call.data.rsplit(":", 1)[-1])
+        async with session_maker() as session:
+            delivery_repo = DeliveryFileRepository(session)
+            deleted_count = await delivery_repo.clear_free_files(product_id)
+
+        await log_admin_action(
+            session_maker,
+            admin_id=call.from_user.id,
+            action="product_clear_delivery_pool",
+            entity_type="product",
+            entity_id=product_id,
+            payload={"deleted_count": deleted_count},
+        )
+        await call.answer("??? ??????." if deleted_count else "????????? ZIP ??? ???????? ???.")
+        await show_delivery_pool_menu(call.message, session_maker, product_id)
 
     @router.callback_query(F.data == "admin:categories")
     async def admin_categories_callback(call: CallbackQuery, session_maker: async_sessionmaker) -> None:
@@ -956,6 +1037,7 @@ def get_admin_router(admin_id: int) -> Router:
                 pass
 
     return router
+
 
 
 

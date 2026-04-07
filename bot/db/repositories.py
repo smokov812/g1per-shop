@@ -193,6 +193,28 @@ class DeliveryFileRepository:
         await self.session.refresh(delivery_file)
         return delivery_file
 
+    async def get(self, delivery_file_id: int) -> ProductDeliveryFile | None:
+        result = await self.session.execute(
+            select(ProductDeliveryFile).where(ProductDeliveryFile.id == delivery_file_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def list_by_product(self, product_id: int, *, limit: int = 15, offset: int = 0) -> list[ProductDeliveryFile]:
+        result = await self.session.execute(
+            select(ProductDeliveryFile)
+            .where(ProductDeliveryFile.product_id == product_id)
+            .order_by(ProductDeliveryFile.created_at.desc(), ProductDeliveryFile.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        return list(result.scalars().all())
+
+    async def count_total(self, product_id: int) -> int:
+        result = await self.session.execute(
+            select(func.count(ProductDeliveryFile.id)).where(ProductDeliveryFile.product_id == product_id)
+        )
+        return int(result.scalar_one() or 0)
+
     async def count_available(self, product_id: int) -> int:
         result = await self.session.execute(
             select(func.count(ProductDeliveryFile.id)).where(
@@ -201,6 +223,35 @@ class DeliveryFileRepository:
             )
         )
         return int(result.scalar_one() or 0)
+
+    async def delete_file(self, *, product_id: int, delivery_file_id: int) -> bool:
+        delivery_file = await self.get(delivery_file_id)
+        if not delivery_file or delivery_file.product_id != product_id:
+            return False
+        if delivery_file.reserved_order_id is not None or delivery_file.delivered_at is not None:
+            return False
+
+        await self.session.delete(delivery_file)
+        await self.session.commit()
+        return True
+
+    async def clear_free_files(self, product_id: int) -> int:
+        result = await self.session.execute(
+            select(ProductDeliveryFile).where(
+                ProductDeliveryFile.product_id == product_id,
+                ProductDeliveryFile.reserved_order_id.is_(None),
+                ProductDeliveryFile.delivered_at.is_(None),
+            )
+        )
+        files = list(result.scalars().all())
+        count = len(files)
+        if not count:
+            return 0
+
+        for delivery_file in files:
+            await self.session.delete(delivery_file)
+        await self.session.commit()
+        return count
 
     async def reserve_for_order(self, *, product_id: int, order_id: int, quantity: int) -> list[ProductDeliveryFile]:
         result = await self.session.execute(

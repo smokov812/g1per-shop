@@ -6,6 +6,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from bot.const import ORDER_STATUS_LABELS, STOCK_STATUS_LABELS
 
 
+
 def admin_menu_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="📂 Создать категорию", callback_data="admin:create_category")
@@ -15,6 +16,7 @@ def admin_menu_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="🧾 Список заказов", callback_data="admin:orders")
     builder.adjust(1)
     return builder.as_markup()
+
 
 
 def category_picker_keyboard(categories, prefix: str, include_empty: bool = False) -> InlineKeyboardMarkup:
@@ -27,6 +29,7 @@ def category_picker_keyboard(categories, prefix: str, include_empty: bool = Fals
     return builder.as_markup()
 
 
+
 def admin_categories_keyboard(categories) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for category in categories:
@@ -36,6 +39,7 @@ def admin_categories_keyboard(categories) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+
 def admin_category_actions_keyboard(category_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="✏️ Переименовать", callback_data=f"admin:category_rename:{category_id}")
@@ -43,6 +47,7 @@ def admin_category_actions_keyboard(category_id: int) -> InlineKeyboardMarkup:
     builder.button(text="⬅️ К списку категорий", callback_data="admin:categories")
     builder.adjust(1)
     return builder.as_markup()
+
 
 
 def stock_status_keyboard(prefix: str) -> InlineKeyboardMarkup:
@@ -58,12 +63,14 @@ def stock_status_keyboard(prefix: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+
 def yes_no_keyboard(prefix: str, yes_text: str = "Да", no_text: str = "Нет") -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=f"✅ {yes_text}", callback_data=f"{prefix}:yes")
     builder.button(text=f"❌ {no_text}", callback_data=f"{prefix}:no")
     builder.adjust(2)
     return builder.as_markup()
+
 
 
 def admin_products_keyboard(products) -> InlineKeyboardMarkup:
@@ -79,6 +86,7 @@ def admin_products_keyboard(products) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+
 def admin_product_actions_keyboard(product_id: int, is_active: bool) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="✏️ Редактировать", callback_data=f"admin:edit_menu:{product_id}")
@@ -92,6 +100,7 @@ def admin_product_actions_keyboard(product_id: int, is_active: bool) -> InlineKe
     return builder.as_markup()
 
 
+
 def admin_edit_fields_keyboard(product_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="🏷️ Название", callback_data=f"admin:edit_field:{product_id}:title")
@@ -99,7 +108,7 @@ def admin_edit_fields_keyboard(product_id: int) -> InlineKeyboardMarkup:
     builder.button(text="📄 Полное описание", callback_data=f"admin:edit_field:{product_id}:full_description")
     builder.button(text="💬 Текст после выдачи", callback_data=f"admin:edit_field:{product_id}:delivery_content")
     builder.button(text="📨 Инструкция после оплаты", callback_data=f"admin:edit_field:{product_id}:post_payment_message")
-    builder.button(text="🗜️ ZIP-пул", callback_data=f"admin:edit_field:{product_id}:delivery_files")
+    builder.button(text="🗜️ ZIP-пул", callback_data=f"admin:delivery_pool:{product_id}")
     builder.button(text="💰 Цена", callback_data=f"admin:edit_field:{product_id}:price")
     builder.button(text="🔖 SKU", callback_data=f"admin:edit_field:{product_id}:sku")
     builder.button(text="🖼️ Фото", callback_data=f"admin:edit_field:{product_id}:image")
@@ -110,12 +119,49 @@ def admin_edit_fields_keyboard(product_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+
+def admin_delivery_pool_keyboard(product_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="➕ Загрузить ZIP", callback_data=f"admin:delivery_pool_upload:{product_id}")
+    builder.button(text="📄 Просмотреть ZIP-пул", callback_data=f"admin:delivery_pool_view:{product_id}:1")
+    builder.button(text="🧹 Очистить свободные ZIP", callback_data=f"admin:delivery_pool_clear_confirm:{product_id}")
+    builder.button(text="⬅️ Назад к редактированию", callback_data=f"admin:edit_menu:{product_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+
+def admin_delivery_pool_files_keyboard(product_id: int, files, page: int, total_pages: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for file in files:
+        if file.reserved_order_id is None and file.delivered_at is None:
+            builder.button(text=f"🗑️ Удалить #{file.id}", callback_data=f"admin:delivery_pool_delete:{product_id}:{file.id}:{page}")
+    if total_pages > 1 and page > 1:
+        builder.button(text="⬅️ Назад", callback_data=f"admin:delivery_pool_view:{product_id}:{page - 1}")
+    if total_pages > 1 and page < total_pages:
+        builder.button(text="➡️ Вперед", callback_data=f"admin:delivery_pool_view:{product_id}:{page + 1}")
+    builder.button(text="⬅️ К меню ZIP-пула", callback_data=f"admin:delivery_pool:{product_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+
+def admin_delivery_pool_clear_keyboard(product_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⚠️ Очистить свободные ZIP", callback_data=f"admin:delivery_pool_clear:{product_id}")
+    builder.button(text="⬅️ Назад к ZIP-пулу", callback_data=f"admin:delivery_pool:{product_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+
 def confirm_delete_keyboard(product_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="⚠️ Да, удалить", callback_data=f"admin:delete_confirm:{product_id}")
     builder.button(text="❌ Отмена", callback_data=f"admin:product:{product_id}")
     builder.adjust(1)
     return builder.as_markup()
+
 
 
 def admin_orders_keyboard(orders, currency: str) -> InlineKeyboardMarkup:
@@ -128,6 +174,7 @@ def admin_orders_keyboard(orders, currency: str) -> InlineKeyboardMarkup:
         )
     builder.adjust(1)
     return builder.as_markup()
+
 
 
 def admin_order_keyboard(order_id: int) -> InlineKeyboardMarkup:
