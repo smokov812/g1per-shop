@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import asyncio
 from html import escape
 
 from aiogram import Bot, F, Router
@@ -40,6 +41,9 @@ from bot.states import CreateCategoryStates, CreateProductStates, EditCategorySt
 from bot.texts import admin_product_caption, order_text
 from bot.validators import ValidationError, validate_optional_text, validate_price, validate_required_text, validate_sku
 
+_DELIVERY_UPLOAD_BATCHES: dict[tuple[int, int], dict] = {}
+_DELIVERY_UPLOAD_TASKS: dict[tuple[int, int], asyncio.Task] = {}
+
 
 async def log_admin_action(
     session_maker: async_sessionmaker,
@@ -59,6 +63,31 @@ async def log_admin_action(
             payload=payload,
         )
 
+
+async def _flush_delivery_upload_batch(
+    *,
+    key: tuple[int, int],
+    message: Message,
+    product_title: str,
+) -> None:
+    await asyncio.sleep(1.2)
+    batch = _DELIVERY_UPLOAD_BATCHES.pop(key, None)
+    _DELIVERY_UPLOAD_TASKS.pop(key, None)
+    if not batch:
+        return
+
+    files_preview = ", ".join(f"<code>{escape(name)}</code>" for name in batch["files"][:5])
+    if len(batch["files"]) > 5:
+        files_preview += f" ? ??? {len(batch['files']) - 5}"
+
+    sync_preview = ", ".join(f"<code>{escape(sync_key)}</code>" for sync_key in sorted(batch["sync_keys"])[:5])
+    sync_text = f"\n???????????: {sync_preview}." if sync_preview else ""
+
+    await message.answer(
+        f"? ??? ?????? <b>{escape(product_title)}</b> ????????? ZIP-??????: <b>{batch['count']}</b>.\n"
+        f"?????? ????????: <b>{batch['available_count']}</b>.\n"
+        f"?????: {files_preview}.{sync_text}"
+    )
 
 
 def get_admin_router(admin_id: int) -> Router:
@@ -566,7 +595,7 @@ def get_admin_router(admin_id: int) -> Router:
             await state.update_data(product_id=product_id)
             await call.answer()
             await call.message.answer(
-                "Отправляйте ZIP-файлы по одному сообщению. Для синхронизации вариантов используйте одинаковый префикс до __, например acc001__tdata.zip и acc001__session.zip. Для товаров под заказ можно загружать ZIP-заглушки только для учета остатков.",
+                "Отправляйте ZIP-файлы по одному или сразу пачкой несколькими сообщениями подряд. После короткой паузы я пришлю одну общую сводку. Для синхронизации вариантов используйте одинаковый префикс до __, например acc001__tdata.zip и acc001__session.zip. Для товаров под заказ можно загружать ZIP-заглушки только для учета остатков.",
                 reply_markup=simple_reply_keyboard(CANCEL_BUTTON),
             )
             return
@@ -707,20 +736,31 @@ def get_admin_router(admin_id: int) -> Router:
             entity_id=data["product_id"],
             payload={"file_name": file_name},
         )
-        sync_note = (
-            f" Синхроключ: <code>{escape(delivery_file.sync_key)}</code>."
-            if delivery_file.sync_key
-            else " Для синхронизации вариантов используйте имя вида <code>acc001__tdata.zip</code>."
+
+        batch_key = (message.from_user.id, data["product_id"])
+        batch = _DELIVERY_UPLOAD_BATCHES.setdefault(
+            batch_key,
+            {
+                "count": 0,
+                "files": [],
+                "sync_keys": set(),
+                "available_count": 0,
+            },
         )
-        await message.answer(
-            f"ZIP <b>{escape(file_name)}</b> добавлен в пул. Сейчас свободно: <b>{available_count}</b>.{sync_note}",
-            reply_markup=simple_reply_keyboard(CANCEL_BUTTON),
+        batch["count"] += 1
+        batch["files"].append(file_name)
+        batch["available_count"] = available_count
+        if delivery_file.sync_key:
+            batch["sync_keys"].add(delivery_file.sync_key)
+
+        existing_task = _DELIVERY_UPLOAD_TASKS.get(batch_key)
+        if existing_task:
+            existing_task.cancel()
+
+        product_title = product.title if product else "товар"
+        _DELIVERY_UPLOAD_TASKS[batch_key] = asyncio.create_task(
+            _flush_delivery_upload_batch(key=batch_key, message=message, product_title=product_title)
         )
-        if product:
-            await message.answer(
-                admin_product_caption(product, config.currency),
-                reply_markup=admin_product_actions_keyboard(product.id, product.is_active),
-            )
 
     @router.message(EditProductStates.delivery_files)
     async def upload_product_delivery_file_invalid(message: Message) -> None:
