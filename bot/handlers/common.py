@@ -33,8 +33,6 @@ def get_common_router(admin_id: int, support_username: str = "") -> Router:
             "Бот умеет показывать каталог, добавлять товары в корзину, "
             "оформлять заказы и принимать оплату через подключенные способы."
         )
-        if has_support:
-            text += f"\n\n{build_support_text()}"
 
         keyboard = main_menu_keyboard(is_admin=is_admin, has_support=has_support)
         if BANNER_PATH.exists():
