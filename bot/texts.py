@@ -109,14 +109,8 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
         lines.append(f"<b>Ручная выдача:</b> {order.preorder_delivery_sent_at.strftime('%Y-%m-%d %H:%M')}")
 
     if include_customer:
-        username = f"@{order.username}" if order.username else "не указан"
-        lines.extend(
-            [
-                f"<b>Покупатель:</b> {escape(order.customer_name)}",
-                f"<b>Контакт:</b> {escape(order.contact)}",
-                f"<b>Telegram:</b> {escape(username)} / <code>{order.user_id}</code>",
-            ]
-        )
+        username = f"@{order.username}" if order.username else f"id:{order.user_id}"
+        lines.append(f"<b>Telegram:</b> {escape(username)}")
         if order.comment:
             lines.append(f"<b>Комментарий:</b> {escape(order.comment)}")
 
