@@ -63,10 +63,8 @@ def get_common_router(
         username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name or "друг"
         text = (
             f"👋 Добро пожаловать, <b>{username}</b>\n\n"
-            "Здесь вы можете:\n"
-            "• выбрать товары в каталоге\n"
-            "• оформить заказ и оплатить его\n"
-            "• открыть раздел <b>О сервисе</b> для правил и поддержки"
+            "G1PER SHOP — цифровой магазин в Telegram.\n"
+            "Выберите нужный раздел в меню ниже."
         )
 
         keyboard = main_menu_keyboard(is_admin=is_admin, has_service=has_service)
@@ -131,4 +129,5 @@ def get_common_router(
         )
 
     return router
+
 
