@@ -96,7 +96,7 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
     if order.external_payment_id:
         lines.append(f"<b>Внешний ID:</b> <code>{escape(order.external_payment_id)}</code>")
     if order.payment_amount is not None and order.payment_currency:
-        lines.append(f"<b>Сумма платежа:</b> {format_price(order.payment_amount, order.payment_currency)}")
+        lines.append(f"<b>Сумма платежа:</b> <code>{format_price(order.payment_amount, order.payment_currency)}</code>")
     if order.payment_network:
         lines.append(f"<b>Сеть:</b> {escape(order.payment_network)}")
     if order.payment_txid:
@@ -121,4 +121,5 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
         lines.append(f"- {escape(item.title)}{suffix} x {item.quantity} = {format_price(subtotal, currency)}")
 
     return "\n".join(lines)
+
 
