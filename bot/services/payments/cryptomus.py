@@ -5,12 +5,16 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 from decimal import Decimal
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from bot.config import Config
 from bot.services.payments.base import BasePaymentService, PaymentContext, PaymentInstructions
+
+
+logger = logging.getLogger(__name__)
 
 
 class CryptomusPaymentService(BasePaymentService):
@@ -50,7 +54,31 @@ class CryptomusPaymentService(BasePaymentService):
         }
         payload = {key: value for key, value in payload.items() if value not in (None, "")}
 
-        response = await asyncio.to_thread(self._request_sync, self.create_invoice_url, payload)
+        try:
+            response = await asyncio.to_thread(self._request_sync, self.create_invoice_url, payload)
+        except RuntimeError as exc:
+            if "1010" not in str(exc):
+                raise
+
+            fallback_payload = {
+                "amount": payload["amount"],
+                "currency": payload["currency"],
+                "order_id": payload["order_id"],
+            }
+            if to_currency:
+                fallback_payload["to_currency"] = to_currency
+            if network and is_crypto_invoice:
+                fallback_payload["network"] = network
+
+            logger.warning(
+                "Cryptomus returned 1010 for full invoice payload, retrying with minimal payload. "
+                "order_id=%s currency=%s to_currency=%s network=%s",
+                payload.get("order_id"),
+                payload.get("currency"),
+                payload.get("to_currency"),
+                payload.get("network"),
+            )
+            response = await asyncio.to_thread(self._request_sync, self.create_invoice_url, fallback_payload)
 
         payment_url = response.get("url") or response.get("payment_url")
         payer_amount = Decimal(str(response.get("payer_amount") or payload["amount"]))
@@ -124,14 +152,31 @@ class CryptomusPaymentService(BasePaymentService):
                 raw = response.read().decode("utf-8")
         except HTTPError as exc:
             raw = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"Cryptomus API error: {raw}") from exc
+            logger.warning(
+                "Cryptomus HTTP error. payload=%s raw=%s",
+                self._sanitize_payload(payload),
+                raw,
+            )
+            raise RuntimeError(self._format_error_message(raw)) from exc
         except URLError as exc:
             raise RuntimeError(f"Cryptomus network error: {exc}") from exc
 
         decoded = json.loads(raw)
+        if decoded.get("state") not in (0, None):
+            logger.warning(
+                "Cryptomus returned non-success state. payload=%s raw=%s",
+                self._sanitize_payload(payload),
+                raw,
+            )
+            raise RuntimeError(self._format_error_message(raw))
         result = decoded.get("result")
         if not isinstance(result, dict):
-            raise RuntimeError(f"Cryptomus invalid response: {raw}")
+            logger.warning(
+                "Cryptomus returned unexpected payload shape. payload=%s raw=%s",
+                self._sanitize_payload(payload),
+                raw,
+            )
+            raise RuntimeError(self._format_error_message(raw))
         return result
 
     def _build_signature(self, payload: dict) -> str:
@@ -144,3 +189,41 @@ class CryptomusPaymentService(BasePaymentService):
         clean_payload = dict(payload)
         clean_payload.pop("sign", None)
         return json.dumps(clean_payload, ensure_ascii=False, separators=(",", ":")).replace("/", "\\/")
+
+    @staticmethod
+    def _sanitize_payload(payload: dict) -> dict:
+        return {
+            key: value
+            for key, value in payload.items()
+            if key not in {"sign"}
+        }
+
+    @staticmethod
+    def _format_error_message(raw: str) -> str:
+        try:
+            decoded = json.loads(raw)
+        except json.JSONDecodeError:
+            return f"Cryptomus API error: {raw}"
+
+        parts: list[str] = []
+        state = decoded.get("state")
+        message = decoded.get("message")
+        errors = decoded.get("errors")
+        result = decoded.get("result")
+
+        if state is not None:
+            parts.append(f"state={state}")
+        if message:
+            parts.append(str(message))
+        if errors:
+            parts.append(f"errors={errors}")
+        if isinstance(result, dict):
+            code = result.get("code")
+            if code is not None:
+                parts.append(f"code={code}")
+        elif result not in (None, ""):
+            parts.append(f"result={result}")
+
+        if not parts:
+            return f"Cryptomus API error: {raw}"
+        return "Cryptomus API error: " + "; ".join(parts)
