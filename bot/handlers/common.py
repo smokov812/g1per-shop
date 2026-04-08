@@ -22,7 +22,7 @@ from bot.const import (
 from bot.keyboards.user import main_menu_keyboard, service_menu_keyboard
 
 BANNER_PATH = Path(__file__).resolve().parents[2] / "banner.png"
-CUSTOM_EMOJI = '<tg-emoji emoji-id="7173162320003080"></tg-emoji>'
+CUSTOM_EMOJI = '<tg-emoji emoji-id="7173162320003080">✨</tg-emoji>'
 
 
 def get_common_router(
@@ -138,4 +138,5 @@ def get_common_router(
         )
 
     return router
+
 

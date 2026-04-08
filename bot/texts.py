@@ -5,7 +5,7 @@ from html import escape
 
 from bot.const import ORDER_STATUS_LABELS, STOCK_STATUS_LABELS
 
-CUSTOM_EMOJI = "<tg-emoji emoji-id=\"7173162320003080\"></tg-emoji>"
+CUSTOM_EMOJI = "<tg-emoji emoji-id=\"7173162320003080\">✨</tg-emoji>"
 
 
 def format_price(amount: Decimal, currency: str) -> str:
@@ -122,6 +122,8 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
         lines.append(f"- {escape(item.title)}{suffix} x {item.quantity} = {format_price(subtotal, currency)}")
 
     return "\n".join(lines)
+
+
 
 
 
