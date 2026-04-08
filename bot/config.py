@@ -42,6 +42,10 @@ class Config:
     bot_token: str
     admin_id: int
     support_username: str
+    offer_url: str
+    privacy_url: str
+    terms_url: str
+    channel_url: str
     database_url: str
     currency: str
     payment_message: str
@@ -99,6 +103,10 @@ def load_config() -> Config:
     bot_token = os.getenv("BOT_TOKEN", "").strip()
     admin_id_raw = os.getenv("ADMIN_ID", "").strip()
     support_username = os.getenv("SUPPORT_USERNAME", "").strip()
+    offer_url = os.getenv("OFFER_URL", "").strip()
+    privacy_url = os.getenv("PRIVACY_URL", "").strip()
+    terms_url = os.getenv("TERMS_URL", "").strip()
+    channel_url = os.getenv("CHANNEL_URL", "").strip()
     database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///shop.db").strip()
     currency = os.getenv("CURRENCY", "USDT").strip() or "USDT"
     payment_provider = os.getenv("PAYMENT_PROVIDER", "manual_crypto").strip() or "manual_crypto"
@@ -138,6 +146,10 @@ def load_config() -> Config:
         bot_token=bot_token,
         admin_id=int(admin_id_raw),
         support_username=support_username,
+        offer_url=offer_url,
+        privacy_url=privacy_url,
+        terms_url=terms_url,
+        channel_url=channel_url,
         database_url=database_url,
         currency=currency,
         payment_message=payment_message,

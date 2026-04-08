@@ -3,7 +3,21 @@
 from aiogram.types import InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
-from bot.const import ADMIN_PANEL_BUTTON, CANCEL_BUTTON, CART_BUTTON, CATALOG_BUTTON, PAYMENT_PROVIDER_LABELS, SKIP_BUTTON, SUPPORT_BUTTON
+from bot.const import (
+    ADMIN_PANEL_BUTTON,
+    CANCEL_BUTTON,
+    CART_BUTTON,
+    CATALOG_BUTTON,
+    PAYMENT_PROVIDER_LABELS,
+    SERVICE_BACK_BUTTON,
+    SERVICE_BUTTON,
+    SERVICE_CHANNEL_BUTTON,
+    SERVICE_OFFER_BUTTON,
+    SERVICE_PRIVACY_BUTTON,
+    SERVICE_SUPPORT_BUTTON,
+    SERVICE_TERMS_BUTTON,
+    SKIP_BUTTON,
+)
 
 
 USER_PAYMENT_LABELS = {
@@ -13,13 +27,25 @@ USER_PAYMENT_LABELS = {
 }
 
 
-def main_menu_keyboard(is_admin: bool = False, has_support: bool = False) -> ReplyKeyboardMarkup:
+def main_menu_keyboard(is_admin: bool = False, has_service: bool = False) -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     builder.row(KeyboardButton(text=f"📚 {CATALOG_BUTTON}"), KeyboardButton(text=f"🛍️ {CART_BUTTON}"))
-    if has_support:
-        builder.row(KeyboardButton(text=f"💬 {SUPPORT_BUTTON}"))
+    if has_service:
+        builder.row(KeyboardButton(text=f"ℹ️ {SERVICE_BUTTON}"))
     if is_admin:
         builder.row(KeyboardButton(text=f"🛠️ {ADMIN_PANEL_BUTTON}"))
+    return builder.as_markup(resize_keyboard=True)
+
+
+
+def service_menu_keyboard() -> ReplyKeyboardMarkup:
+    builder = ReplyKeyboardBuilder()
+    builder.row(KeyboardButton(text=SERVICE_OFFER_BUTTON))
+    builder.row(KeyboardButton(text=SERVICE_PRIVACY_BUTTON))
+    builder.row(KeyboardButton(text=SERVICE_TERMS_BUTTON))
+    builder.row(KeyboardButton(text=SERVICE_CHANNEL_BUTTON))
+    builder.row(KeyboardButton(text=SERVICE_SUPPORT_BUTTON))
+    builder.row(KeyboardButton(text=f"⬅️ {SERVICE_BACK_BUTTON}"))
     return builder.as_markup(resize_keyboard=True)
 
 
