@@ -14,10 +14,9 @@ def product_caption(product, currency: str) -> str:
     lines = [
         f"<b>{escape(product.title)}</b>",
         "",
-        "<b>Основное</b>",
-        f"• <b>Цена:</b> {format_price(product.price, currency)}",
-        f"• <b>Наличие:</b> {escape(STOCK_STATUS_LABELS.get(product.stock_status, product.stock_status))}",
-        f"• <b>SKU:</b> {escape(product.sku)}",
+        f"💰 <b>Цена:</b> <b>{format_price(product.price, currency)}</b>",
+        f"— <b>Наличие:</b> {escape(STOCK_STATUS_LABELS.get(product.stock_status, product.stock_status))}",
+        f"— <b>SKU:</b> {escape(product.sku)}",
     ]
 
     if product.short_description:
