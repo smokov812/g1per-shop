@@ -48,14 +48,22 @@ def get_common_router(
     def support_text() -> str:
         username = normalize_username(support_username)
         if not username:
-            return "Контакт поддержки пока не указан."
-        return f"Тех. поддержка: {username}\nПрямая ссылка: https://t.me/{username.lstrip('@')}"
+            return "<b>Тех. поддержка</b>\n\nКонтакт поддержки пока не указан."
+        return (
+            "<b>Тех. поддержка</b>\n\n"
+            f"Контакт: {username}\n"
+            f"Ссылка:\nhttps://t.me/{username.lstrip('@')}"
+        )
 
     def link_text(title: str, url: str) -> str:
         link = url.strip()
         if not link:
-            return f"{title} будет добавлен позже."
-        return f"{title}: {link}"
+            return f"<b>{title}</b>\n\nБудет добавлено позже."
+        return (
+            f"<b>{title}</b>\n\n"
+            "Открыть документ:\n"
+            f"{link}"
+        )
 
     @router.message(CommandStart())
     async def cmd_start(message: Message) -> None:
@@ -96,7 +104,7 @@ def get_common_router(
 
     @router.message(lambda message: button_matches(message.text, SERVICE_BUTTON))
     async def show_service_menu(message: Message) -> None:
-        await message.answer("Раздел сервиса.", reply_markup=service_menu_keyboard())
+        await message.answer("<b>О сервисе</b>\n\nВыберите нужный раздел ниже.", reply_markup=service_menu_keyboard())
 
     @router.message(lambda message: button_matches(message.text, SERVICE_OFFER_BUTTON))
     async def show_offer(message: Message) -> None:
@@ -129,5 +137,3 @@ def get_common_router(
         )
 
     return router
-
-

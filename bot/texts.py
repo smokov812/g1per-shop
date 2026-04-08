@@ -14,20 +14,20 @@ def product_caption(product, currency: str) -> str:
     lines = [
         f"<b>{escape(product.title)}</b>",
         "",
-        f"<b>Цена:</b> {format_price(product.price, currency)}",
-        f"<b>Наличие:</b> {escape(STOCK_STATUS_LABELS.get(product.stock_status, product.stock_status))}",
-        f"<b>SKU:</b> {escape(product.sku)}",
+        "<b>Основное</b>",
+        f"• <b>Цена:</b> {format_price(product.price, currency)}",
+        f"• <b>Наличие:</b> {escape(STOCK_STATUS_LABELS.get(product.stock_status, product.stock_status))}",
+        f"• <b>SKU:</b> {escape(product.sku)}",
     ]
 
     if product.short_description:
-        lines.extend(["", f"<b>Кратко:</b> {escape(product.short_description)}"])
+        lines.extend(["", "<b>Кратко</b>", escape(product.short_description)])
     if product.full_description:
-        lines.extend(["", f"<b>Описание:</b>\n{escape(product.full_description)}"])
+        lines.extend(["", "<b>Описание</b>", escape(product.full_description)])
     if product.stock_status == "preorder":
-        lines.extend(["", "<b>Выдача:</b> вручную после оплаты"])
+        lines.extend(["", "<b>Выдача</b>", "Вручную после оплаты"])
 
     return "\n".join(lines)
-
 
 def admin_product_caption(product, currency: str) -> str:
     category_name = product.category.title if product.category else "Без категории"
