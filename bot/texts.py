@@ -14,7 +14,7 @@ def product_caption(product, currency: str) -> str:
     lines = [
         f"<b>{escape(product.title)}</b>",
         "",
-        f"💰 <b>Цена:</b> <b>{format_price(product.price, currency)}</b>",
+        f"💰 <b>Цена:</b> <code>{format_price(product.price, currency)}</code>",
         f"— <b>Наличие:</b> {escape(STOCK_STATUS_LABELS.get(product.stock_status, product.stock_status))}",
         f"— <b>SKU:</b> {escape(product.sku)}",
     ]
@@ -121,3 +121,4 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
         lines.append(f"- {escape(item.title)}{suffix} x {item.quantity} = {format_price(subtotal, currency)}")
 
     return "\n".join(lines)
+
