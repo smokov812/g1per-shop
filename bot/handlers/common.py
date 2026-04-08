@@ -22,6 +22,7 @@ from bot.const import (
 from bot.keyboards.user import main_menu_keyboard, service_menu_keyboard
 
 BANNER_PATH = Path(__file__).resolve().parents[2] / "banner.png"
+CUSTOM_EMOJI = '<tg-emoji emoji-id="7173162320003080"></tg-emoji>'
 
 
 def get_common_router(
@@ -48,9 +49,9 @@ def get_common_router(
     def support_text() -> str:
         username = normalize_username(support_username)
         if not username:
-            return "<b>Тех. поддержка</b>\n\nКонтакт поддержки пока не указан."
+            return f"{CUSTOM_EMOJI} <b>Тех. поддержка</b>\n\nКонтакт поддержки пока не указан."
         return (
-            "<b>Тех. поддержка</b>\n\n"
+            f"{CUSTOM_EMOJI} <b>Тех. поддержка</b>\n\n"
             f"Контакт: {username}\n"
             f"Ссылка:\nhttps://t.me/{username.lstrip('@')}"
         )
@@ -58,9 +59,9 @@ def get_common_router(
     def link_text(title: str, url: str) -> str:
         link = url.strip()
         if not link:
-            return f"<b>{title}</b>\n\nБудет добавлено позже."
+            return f"{CUSTOM_EMOJI} <b>{title}</b>\n\nБудет добавлено позже."
         return (
-            f"<b>{title}</b>\n\n"
+            f"{CUSTOM_EMOJI} <b>{title}</b>\n\n"
             "Открыть документ:\n"
             f"{link}"
         )
@@ -70,7 +71,7 @@ def get_common_router(
         is_admin = message.from_user.id == admin_id
         username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name or "друг"
         text = (
-            f"👋 Добро пожаловать, <b>{username}</b>\n\n"
+            f"{CUSTOM_EMOJI} Добро пожаловать, <b>{username}</b>\n\n"
             "G1PER SHOP — цифровой магазин в Telegram.\n"
             "Выберите нужный раздел в меню ниже."
         )
@@ -95,7 +96,7 @@ def get_common_router(
     @router.message(lambda message: button_matches(message.text, MAIN_MENU_BUTTON))
     async def show_main_menu(message: Message) -> None:
         await message.answer(
-            "Главное меню.",
+            f"{CUSTOM_EMOJI} <b>Главное меню</b>\n\nВыберите нужный раздел ниже.",
             reply_markup=main_menu_keyboard(
                 is_admin=message.from_user.id == admin_id,
                 has_service=has_service,
@@ -104,7 +105,7 @@ def get_common_router(
 
     @router.message(lambda message: button_matches(message.text, SERVICE_BUTTON))
     async def show_service_menu(message: Message) -> None:
-        await message.answer("<b>О сервисе</b>\n\nВыберите нужный раздел ниже.", reply_markup=service_menu_keyboard())
+        await message.answer(f"{CUSTOM_EMOJI} <b>О сервисе</b>\n\nВыберите нужный раздел ниже.", reply_markup=service_menu_keyboard())
 
     @router.message(lambda message: button_matches(message.text, SERVICE_OFFER_BUTTON))
     async def show_offer(message: Message) -> None:
@@ -129,7 +130,7 @@ def get_common_router(
     @router.message(lambda message: button_matches(message.text, SERVICE_BACK_BUTTON))
     async def service_back(message: Message) -> None:
         await message.answer(
-            "Главное меню.",
+            f"{CUSTOM_EMOJI} <b>Главное меню</b>\n\nВыберите нужный раздел ниже.",
             reply_markup=main_menu_keyboard(
                 is_admin=message.from_user.id == admin_id,
                 has_service=has_service,
@@ -137,3 +138,4 @@ def get_common_router(
         )
 
     return router
+

@@ -5,6 +5,8 @@ from html import escape
 
 from bot.const import ORDER_STATUS_LABELS, STOCK_STATUS_LABELS
 
+CUSTOM_EMOJI = "<tg-emoji emoji-id=\"7173162320003080\"></tg-emoji>"
+
 
 def format_price(amount: Decimal, currency: str) -> str:
     return f"{amount:.2f} {escape(currency)}"
@@ -14,7 +16,7 @@ def product_caption(product, currency: str) -> str:
     lines = [
         f"<b>{escape(product.title)}</b>",
         "",
-        f"💰 <b>Цена:</b> <b>{format_price(product.price, currency)}</b>",
+        f"{CUSTOM_EMOJI} <b>Цена:</b> <b>{format_price(product.price, currency)}</b>",
         f"— <b>Наличие:</b> {escape(STOCK_STATUS_LABELS.get(product.stock_status, product.stock_status))}",
         f"— <b>SKU:</b> {escape(product.sku)}",
     ]
@@ -89,7 +91,7 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
     ]
 
     if order.payment_provider:
-        lines.append(f"<b>Провайдер оплаты:</b> {escape(order.payment_provider)}")
+        lines.append(f"{CUSTOM_EMOJI} <b>Провайдер оплаты:</b> {escape(order.payment_provider)}")
     if order.payment_status:
         lines.append(f"<b>Статус платежа:</b> {escape(order.payment_status)}")
     if order.external_payment_id:
@@ -109,7 +111,7 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
 
     if include_customer:
         username = f"@{order.username}" if order.username else f"id:{order.user_id}"
-        lines.append(f"<b>Telegram:</b> {escape(username)}")
+        lines.append(f"{CUSTOM_EMOJI} <b>Telegram:</b> {escape(username)}")
         if order.comment:
             lines.append(f"<b>Комментарий:</b> {escape(order.comment)}")
 
@@ -120,5 +122,6 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
         lines.append(f"- {escape(item.title)}{suffix} x {item.quantity} = {format_price(subtotal, currency)}")
 
     return "\n".join(lines)
+
 
 
