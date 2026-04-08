@@ -8,6 +8,7 @@ from decimal import Decimal
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from uuid import uuid4
 
 from bot.config import Config
 from bot.services.payments.base import BasePaymentService, PaymentContext, PaymentInstructions
@@ -30,10 +31,11 @@ class LztMarketPaymentService(BasePaymentService):
         return True
 
     async def create_payment(self, context: PaymentContext) -> PaymentInstructions:
+        merchant_payment_id = f"order-{context.order_id}-{uuid4().hex[:8]}"
         payload = {
             "currency": self.config.lzt_market_currency,
             "amount": float(context.amount),
-            "payment_id": str(context.order_id),
+            "payment_id": merchant_payment_id,
             "comment": f"Order #{context.order_id}",
             "url_success": self.config.lzt_market_success_url or None,
             "url_callback": self.config.lzt_market_webhook_url or None,
@@ -44,7 +46,12 @@ class LztMarketPaymentService(BasePaymentService):
 
         response = await asyncio.to_thread(self._request_sync, method="POST", url=self.invoice_url, payload=payload)
 
-        external_id = self._string(response.get("invoice_id") or response.get("id") or response.get("payment_id") or payload["payment_id"])
+        external_id = self._string(
+            response.get("invoice_id")
+            or response.get("id")
+            or response.get("payment_id")
+            or merchant_payment_id
+        )
         payment_url = self._extract_payment_url(response)
 
         invoice_details = None

@@ -5,6 +5,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
+import re
 from pathlib import Path
 
 from sqlalchemy import delete, func, select, update as sql_update
@@ -855,9 +856,17 @@ def _optional_string(value) -> str | None:
 
 def _parse_order_id(value) -> int | None:
     raw = _optional_string(value)
-    if raw and raw.isdigit():
+    if not raw:
+        return None
+    if raw.isdigit():
         return int(raw)
+    match = re.search(r'(?:^|[^0-9])(\d+)(?:[^0-9]|$)', raw)
+    if match:
+        return int(match.group(1))
     return None
+
+
+
 
 
 

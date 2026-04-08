@@ -1,8 +1,10 @@
 ﻿from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from aiogram import Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import FSInputFile, Message
@@ -23,6 +25,7 @@ from bot.keyboards.user import main_menu_keyboard, service_menu_keyboard
 
 BANNER_PATH = Path(__file__).resolve().parents[2] / "banner.png"
 CUSTOM_EMOJI = '<tg-emoji emoji-id="7173162320003080">✨</tg-emoji>'
+logger = logging.getLogger(__name__)
 
 
 def get_common_router(
@@ -69,7 +72,11 @@ def get_common_router(
     @router.message(CommandStart())
     async def cmd_start(message: Message) -> None:
         is_admin = message.from_user.id == admin_id
-        username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name or "друг"
+        username = (
+            f"@{message.from_user.username}"
+            if message.from_user.username
+            else message.from_user.first_name or "друг"
+        )
         text = (
             f"{CUSTOM_EMOJI} Добро пожаловать, <b>{username}</b>\n\n"
             "G1PER SHOP — цифровой магазин в Telegram.\n"
@@ -78,15 +85,21 @@ def get_common_router(
 
         keyboard = main_menu_keyboard(is_admin=is_admin, has_service=has_service)
         if BANNER_PATH.exists():
-            await message.answer_photo(FSInputFile(BANNER_PATH), caption=text, reply_markup=keyboard)
-        else:
-            await message.answer(text, reply_markup=keyboard)
+            try:
+                await message.answer_photo(FSInputFile(BANNER_PATH), caption=text, reply_markup=keyboard)
+                return
+            except TelegramBadRequest as exc:
+                logger.warning("Failed to send banner %s: %s", BANNER_PATH, exc)
+
+        await message.answer(text, reply_markup=keyboard)
 
     @router.message(Command("cancel"))
     @router.message(lambda message: button_matches(message.text, CANCEL_BUTTON))
     async def cancel_action(message: Message, state: FSMContext) -> None:
         current_state = await state.get_state()
-        keyboard = main_menu_keyboard(is_admin=message.from_user.id == admin_id, has_service=has_service)
+        keyboard = main_menu_keyboard(
+            is_admin=message.from_user.id == admin_id, has_service=has_service
+        )
         if current_state:
             await state.clear()
             await message.answer("Текущее действие отменено.", reply_markup=keyboard)
@@ -105,23 +118,37 @@ def get_common_router(
 
     @router.message(lambda message: button_matches(message.text, SERVICE_BUTTON))
     async def show_service_menu(message: Message) -> None:
-        await message.answer(f"{CUSTOM_EMOJI} <b>О сервисе</b>\n\nВыберите нужный раздел ниже.", reply_markup=service_menu_keyboard())
+        await message.answer(
+            f"{CUSTOM_EMOJI} <b>О сервисе</b>\n\nВыберите нужный раздел ниже.",
+            reply_markup=service_menu_keyboard(),
+        )
 
     @router.message(lambda message: button_matches(message.text, SERVICE_OFFER_BUTTON))
     async def show_offer(message: Message) -> None:
-        await message.answer(link_text("Оферта", offer_url), reply_markup=service_menu_keyboard())
+        await message.answer(
+            link_text("Оферта", offer_url), reply_markup=service_menu_keyboard()
+        )
 
     @router.message(lambda message: button_matches(message.text, SERVICE_PRIVACY_BUTTON))
     async def show_privacy(message: Message) -> None:
-        await message.answer(link_text("Политика конфиденциальности", privacy_url), reply_markup=service_menu_keyboard())
+        await message.answer(
+            link_text("Политика конфиденциальности", privacy_url),
+            reply_markup=service_menu_keyboard(),
+        )
 
     @router.message(lambda message: button_matches(message.text, SERVICE_TERMS_BUTTON))
     async def show_terms(message: Message) -> None:
-        await message.answer(link_text("Пользовательское соглашение", terms_url), reply_markup=service_menu_keyboard())
+        await message.answer(
+            link_text("Пользовательское соглашение", terms_url),
+            reply_markup=service_menu_keyboard(),
+        )
 
     @router.message(lambda message: button_matches(message.text, SERVICE_CHANNEL_BUTTON))
     async def show_channel(message: Message) -> None:
-        await message.answer(link_text("Новостной канал", channel_url), reply_markup=service_menu_keyboard())
+        await message.answer(
+            link_text("Новостной канал", channel_url),
+            reply_markup=service_menu_keyboard(),
+        )
 
     @router.message(lambda message: button_matches(message.text, SERVICE_SUPPORT_BUTTON))
     async def show_support(message: Message) -> None:
@@ -138,5 +165,3 @@ def get_common_router(
         )
 
     return router
-
-
