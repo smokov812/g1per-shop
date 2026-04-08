@@ -3,11 +3,29 @@
 from decimal import Decimal
 from html import escape
 
-from bot.const import ORDER_STATUS_LABELS, STOCK_STATUS_LABELS
+from bot.const import ORDER_STATUS_LABELS, STOCK_STATUS_LABELS, StockStatus
 
 
 def format_price(amount: Decimal, currency: str) -> str:
     return f"{amount:.2f} {escape(currency)}"
+
+
+def _available_stock_text(product) -> str:
+    stock_label = STOCK_STATUS_LABELS.get(product.stock_status, product.stock_status)
+    delivery_files = getattr(product, "delivery_files", None) or []
+
+    if product.stock_status == StockStatus.IN_STOCK.value and delivery_files:
+        available_count = len(
+            [
+                item
+                for item in delivery_files
+                if item.reserved_order_id is None and item.delivered_at is None
+            ]
+        )
+        suffix = "шт." if available_count != 1 else "шт."
+        return f"{available_count} {suffix}"
+
+    return escape(stock_label)
 
 
 def product_caption(product, currency: str) -> str:
@@ -15,7 +33,7 @@ def product_caption(product, currency: str) -> str:
         f"<b>{escape(product.title)}</b>",
         "",
         f"💰 <b>Цена:</b> <code>{format_price(product.price, currency)}</code>",
-        f"— <b>Наличие:</b> {escape(STOCK_STATUS_LABELS.get(product.stock_status, product.stock_status))}",
+        f"— <b>Наличие:</b> {_available_stock_text(product)}",
         f"— <b>SKU:</b> {escape(product.sku)}",
     ]
 
@@ -32,7 +50,13 @@ def product_caption(product, currency: str) -> str:
 def admin_product_caption(product, currency: str) -> str:
     category_name = product.category.title if product.category else "Без категории"
     visibility = "Активен" if product.is_active else "Скрыт"
-    available_zip_count = len([item for item in getattr(product, "delivery_files", []) if item.reserved_order_id is None])
+    available_zip_count = len(
+        [
+            item
+            for item in getattr(product, "delivery_files", [])
+            if item.reserved_order_id is None and item.delivered_at is None
+        ]
+    )
 
     lines = [
         f"<b>Товар #{product.id}</b>",
@@ -121,5 +145,3 @@ def order_text(order, currency: str, include_customer: bool = True) -> str:
         lines.append(f"- {escape(item.title)}{suffix} x {item.quantity} = {format_price(subtotal, currency)}")
 
     return "\n".join(lines)
-
-
