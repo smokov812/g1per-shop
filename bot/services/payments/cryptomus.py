@@ -31,11 +31,17 @@ class CryptomusPaymentService(BasePaymentService):
         return True
 
     async def create_payment(self, context: PaymentContext) -> PaymentInstructions:
+        invoice_currency = self.config.currency
+        to_currency = self.config.cryptomus_to_currency or None
+        network = self.config.cryptomus_network or None
+        is_crypto_invoice = bool(to_currency) or invoice_currency.upper() not in {"USD", "EUR", "RUB", "UAH", "KZT", "BYN", "TRY"}
+
         payload = {
             "amount": f"{context.amount:.2f}",
-            "currency": self.config.currency,
+            "currency": invoice_currency,
             "order_id": str(context.order_id),
-            "network": self.config.cryptomus_network or None,
+            "to_currency": to_currency,
+            "network": network if (network and is_crypto_invoice) else None,
             "url_callback": self.config.cryptomus_webhook_url or None,
             "url_return": self.config.cryptomus_return_url or None,
             "url_success": self.config.cryptomus_success_url or None,

@@ -52,6 +52,7 @@ class Config:
     crypto_wallet: str
     cryptomus_merchant_id: str
     cryptomus_api_key: str
+    cryptomus_to_currency: str
     cryptomus_network: str
     cryptomus_return_url: str
     cryptomus_success_url: str
@@ -109,6 +110,7 @@ def load_config() -> Config:
     crypto_wallet = os.getenv("CRYPTO_WALLET", "").strip()
     cryptomus_merchant_id = os.getenv("CRYPTOMUS_MERCHANT_ID", "").strip()
     cryptomus_api_key = os.getenv("CRYPTOMUS_API_KEY", "").strip()
+    cryptomus_to_currency = os.getenv("CRYPTOMUS_TO_CURRENCY", "").strip()
     cryptomus_network = os.getenv("CRYPTOMUS_NETWORK", "").strip()
     cryptomus_return_url = os.getenv("CRYPTOMUS_RETURN_URL", "").strip()
     cryptomus_success_url = os.getenv("CRYPTOMUS_SUCCESS_URL", "").strip()
@@ -146,6 +148,7 @@ def load_config() -> Config:
         crypto_wallet=crypto_wallet,
         cryptomus_merchant_id=cryptomus_merchant_id,
         cryptomus_api_key=cryptomus_api_key,
+        cryptomus_to_currency=cryptomus_to_currency,
         cryptomus_network=cryptomus_network,
         cryptomus_return_url=cryptomus_return_url,
         cryptomus_success_url=cryptomus_success_url,
