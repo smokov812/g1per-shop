@@ -141,6 +141,7 @@ class CryptomusPaymentService(BasePaymentService):
             data=body.encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
+                "User-Agent": "G1perShopBot/1.0",
                 "merchant": self.config.cryptomus_merchant_id,
                 "sign": signature,
             },
@@ -227,3 +228,5 @@ class CryptomusPaymentService(BasePaymentService):
         if not parts:
             return f"Cryptomus API error: {raw}"
         return "Cryptomus API error: " + "; ".join(parts)
+
+
