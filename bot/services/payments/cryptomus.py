@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import logging
+from datetime import datetime, timezone
 from decimal import Decimal
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -83,8 +84,8 @@ class CryptomusPaymentService(BasePaymentService):
         payment_url = response.get("url") or response.get("payment_url")
         payer_amount = Decimal(str(response.get("payer_amount") or payload["amount"]))
         payer_currency = str(response.get("payer_currency") or payload["currency"])
-        network = str(response.get("network") or self.config.cryptomus_network or "не указана")
-        expired_at = response.get("expired_at") or response.get("expired_date")
+        network = str(response.get("network") or self.config.cryptomus_network or "")
+        expired_at = self._format_expired_at(response.get("expired_at") or response.get("expired_date"))
         status = str(response.get("status") or "check")
 
         lines = [
@@ -92,7 +93,6 @@ class CryptomusPaymentService(BasePaymentService):
             "",
             "Счет сформирован через <b>Cryptomus</b>.",
             f"К оплате: <b>{payer_amount:.2f} {payer_currency}</b>",
-            f"Сеть: <b>{network}</b>",
         ]
 
         if expired_at:
@@ -190,6 +190,19 @@ class CryptomusPaymentService(BasePaymentService):
         clean_payload = dict(payload)
         clean_payload.pop("sign", None)
         return json.dumps(clean_payload, ensure_ascii=False, separators=(",", ":")).replace("/", "\\/")
+
+    @staticmethod
+    def _format_expired_at(value) -> str | None:
+        if value in (None, ""):
+            return None
+        if isinstance(value, (int, float)):
+            dt = datetime.fromtimestamp(value, tz=timezone.utc)
+            return dt.strftime("%Y-%m-%d %H:%M UTC")
+        value_str = str(value).strip()
+        if value_str.isdigit():
+            dt = datetime.fromtimestamp(int(value_str), tz=timezone.utc)
+            return dt.strftime("%Y-%m-%d %H:%M UTC")
+        return value_str
 
     @staticmethod
     def _sanitize_payload(payload: dict) -> dict:
