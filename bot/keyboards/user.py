@@ -26,51 +26,26 @@ USER_PAYMENT_LABELS = {
     "lzt_market": "🛒 LOLZ Market",
 }
 
-CUSTOM_BUTTON_EMOJI_ID = "5472055112702629499"
-
-
-def _reply_button(text: str, *, icon_custom_emoji_id: str | None = None, style: str | None = None) -> KeyboardButton:
-    return KeyboardButton(
-        text=text,
-        icon_custom_emoji_id=icon_custom_emoji_id,
-        style=style,
-    )
-
 
 def main_menu_keyboard(is_admin: bool = False, has_service: bool = False) -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
-    builder.row(
-        _reply_button(CATALOG_BUTTON, style="success"),
-        _reply_button(CART_BUTTON, style="primary"),
-    )
+    builder.row(KeyboardButton(text=f"📚 {CATALOG_BUTTON}"), KeyboardButton(text=f"🛍️ {CART_BUTTON}"))
     if has_service:
-        builder.row(
-            _reply_button(
-                SERVICE_BUTTON,
-                icon_custom_emoji_id=CUSTOM_BUTTON_EMOJI_ID,
-                style="primary",
-            )
-        )
+        builder.row(KeyboardButton(text=f"ℹ️ {SERVICE_BUTTON}"))
     if is_admin:
-        builder.row(_reply_button(ADMIN_PANEL_BUTTON, style="danger"))
+        builder.row(KeyboardButton(text=f"🛠️ {ADMIN_PANEL_BUTTON}"))
     return builder.as_markup(resize_keyboard=True)
 
 
 
 def service_menu_keyboard() -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
-    builder.row(_reply_button(SERVICE_OFFER_BUTTON))
-    builder.row(_reply_button(SERVICE_PRIVACY_BUTTON))
-    builder.row(_reply_button(SERVICE_TERMS_BUTTON))
-    builder.row(_reply_button(SERVICE_CHANNEL_BUTTON))
-    builder.row(
-        _reply_button(
-            SERVICE_SUPPORT_BUTTON,
-            icon_custom_emoji_id=CUSTOM_BUTTON_EMOJI_ID,
-            style="primary",
-        )
-    )
-    builder.row(_reply_button(SERVICE_BACK_BUTTON, style="danger"))
+    builder.row(KeyboardButton(text=SERVICE_OFFER_BUTTON))
+    builder.row(KeyboardButton(text=SERVICE_PRIVACY_BUTTON))
+    builder.row(KeyboardButton(text=SERVICE_TERMS_BUTTON))
+    builder.row(KeyboardButton(text=SERVICE_CHANNEL_BUTTON))
+    builder.row(KeyboardButton(text=SERVICE_SUPPORT_BUTTON))
+    builder.row(KeyboardButton(text=f"⬅️ {SERVICE_BACK_BUTTON}"))
     return builder.as_markup(resize_keyboard=True)
 
 
@@ -78,12 +53,12 @@ def service_menu_keyboard() -> ReplyKeyboardMarkup:
 def simple_reply_keyboard(*buttons: str) -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     for button in buttons:
+        text = button
         if button == CANCEL_BUTTON:
-            builder.row(_reply_button(button, style="danger"))
+            text = f"❌ {button}"
         elif button == SKIP_BUTTON:
-            builder.row(_reply_button(button, style="primary"))
-        else:
-            builder.row(_reply_button(button))
+            text = f"⏭️ {button}"
+        builder.row(KeyboardButton(text=text))
     return builder.as_markup(resize_keyboard=True)
 
 
