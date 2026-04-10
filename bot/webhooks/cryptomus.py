@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 
 from aiohttp import web
-from aiogram import Bot
+from aiogram import Bot, Dispatcher
 from sqlalchemy import text
 
 from bot.config import Config
@@ -18,11 +18,12 @@ from bot.texts import order_text
 logger = logging.getLogger(__name__)
 
 
-def create_webhook_app(*, config: Config, session_maker, bot: Bot) -> web.Application:
+def create_webhook_app(*, config: Config, session_maker, bot: Bot, dispatcher: Dispatcher) -> web.Application:
     app = web.Application()
     app["config"] = config
     app["session_maker"] = session_maker
     app["bot"] = bot
+    app["dispatcher"] = dispatcher
     app["cryptomus_service"] = CryptomusPaymentService(config)
     app["lzt_service"] = LztMarketPaymentService(config)
 
@@ -32,6 +33,8 @@ def create_webhook_app(*, config: Config, session_maker, bot: Bot) -> web.Applic
     app.router.add_get("/success", generic_success_page)
     app.router.add_get("/return", generic_success_page)
     app.router.add_get("/lzt-success", lzt_success_page)
+    if config.telegram_webhook_enabled:
+        app.router.add_post(config.telegram_webhook_path, telegram_webhook)
     if config.cryptomus_webhook_enabled:
         app.router.add_post(config.cryptomus_webhook_path, cryptomus_webhook)
     if config.lzt_market_webhook_enabled:
@@ -94,6 +97,9 @@ async def readiness(request: web.Request) -> web.Response:
         checks["lzt_credentials"] = "ok" if config.lzt_market_api_key and config.lzt_market_merchant_id else "missing"
         checks["lzt_webhook"] = "ok" if (not config.lzt_market_webhook_enabled or config.lzt_market_webhook_url) else "missing webhook url"
 
+    if config.telegram_webhook_enabled:
+        checks["telegram_webhook"] = "ok" if config.telegram_webhook_url else "missing webhook url"
+
     if config.database_backend == "sqlite":
         warnings.append("SQLite подходит для MVP, но для production при деньгах лучше использовать Postgres.")
 
@@ -132,6 +138,26 @@ async def cryptomus_webhook(request: web.Request) -> web.Response:
             await deliver_order_digital_content(bot=bot, session_maker=session_maker, order_id=result.order.id, admin_id=config.admin_id, manager_username=config.order_manager_username)
 
     return web.json_response({"ok": True, "duplicate": result.duplicate, "applied": result.applied, "order_id": result.order.id if result.order else None})
+
+
+async def telegram_webhook(request: web.Request) -> web.Response:
+    config: Config = request.app["config"]
+    bot: Bot = request.app["bot"]
+    dispatcher: Dispatcher = request.app["dispatcher"]
+
+    if config.telegram_webhook_secret:
+        header_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        if header_token != config.telegram_webhook_secret:
+            logger.warning("Rejected Telegram webhook with invalid secret token")
+            return web.json_response({"ok": False, "error": "invalid secret"}, status=401)
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "invalid json"}, status=400)
+
+    await dispatcher.feed_raw_update(bot, payload)
+    return web.json_response({"ok": True})
 
 
 async def lzt_market_webhook(request: web.Request) -> web.Response:

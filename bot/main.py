@@ -7,7 +7,7 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramNetworkError
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
 
@@ -55,6 +55,8 @@ def validate_runtime_config(config: Config) -> None:
         raise RuntimeError("Нельзя включить webhook Cryptomus при WEB_SERVER_ENABLED=false.")
     if config.lzt_market_webhook_enabled and not config.web_server_enabled:
         raise RuntimeError("Нельзя включить webhook LOLZ Market при WEB_SERVER_ENABLED=false.")
+    if config.telegram_webhook_enabled and not config.web_server_enabled:
+        raise RuntimeError("Нельзя включить webhook Telegram при WEB_SERVER_ENABLED=false.")
 
     if "cryptomus" in config.enabled_payment_providers:
         if not config.cryptomus_merchant_id or not config.cryptomus_api_key:
@@ -68,6 +70,9 @@ def validate_runtime_config(config: Config) -> None:
         if config.lzt_market_webhook_enabled and not config.lzt_market_webhook_url:
             raise RuntimeError("При включенном webhook LOLZ Market нужно заполнить LZT_MARKET_WEBHOOK_URL.")
 
+    if config.telegram_webhook_enabled and not config.telegram_webhook_url:
+        raise RuntimeError("При включенном webhook Telegram нужно заполнить TELEGRAM_WEBHOOK_URL.")
+
     if config.database_backend == "sqlite":
         logger.warning("Бот запущен на SQLite. Для production при реальных оплатах лучше использовать Postgres.")
 
@@ -75,11 +80,11 @@ def validate_runtime_config(config: Config) -> None:
         logger.info("TRUST_PROXY_HEADERS=true: доверяйте этому режиму только за reverse proxy, который ты контролируешь.")
 
 
-async def start_web_server(*, bot: Bot, config: Config, session_maker) -> web.AppRunner | None:
+async def start_web_server(*, bot: Bot, config: Config, session_maker, dispatcher: Dispatcher) -> web.AppRunner | None:
     if not config.web_server_enabled:
         return None
 
-    app = create_webhook_app(config=config, session_maker=session_maker, bot=bot)
+    app = create_webhook_app(config=config, session_maker=session_maker, bot=bot, dispatcher=dispatcher)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, config.web_server_host, config.web_server_port)
@@ -143,6 +148,16 @@ async def payment_sync_worker(*, bot: Bot, config: Config, session_maker, paymen
         raise
 
 
+async def ensure_webhook(*, bot: Bot, url: str, secret_token: str | None, retry_seconds: int = 10) -> None:
+    while True:
+        try:
+            await bot.set_webhook(url=url, secret_token=secret_token, drop_pending_updates=True)
+            return
+        except TelegramNetworkError as exc:
+            logger.warning("Failed to set Telegram webhook: %s. Retry in %ss", exc, retry_seconds)
+            await asyncio.sleep(retry_seconds)
+
+
 async def run_polling() -> None:
     logging.basicConfig(level=logging.INFO)
 
@@ -181,12 +196,18 @@ async def run_polling() -> None:
     dispatcher.include_router(get_user_router())
     dispatcher.include_router(get_admin_router(config.admin_id))
 
-    await bot.delete_webhook(drop_pending_updates=True)
-    await validate_admin_chat(bot, config.admin_id)
-    await set_commands(bot)
-    logger.info("Admin chat validation passed for admin_id=%s", config.admin_id)
+    try:
+        await validate_admin_chat(bot, config.admin_id)
+        logger.info("Admin chat validation passed for admin_id=%s", config.admin_id)
+    except TelegramNetworkError as exc:
+        logger.warning("Unable to validate admin chat due to Telegram API timeout: %s", exc)
 
-    webhook_runner = await start_web_server(bot=bot, config=config, session_maker=session_maker)
+    try:
+        await set_commands(bot)
+    except TelegramNetworkError as exc:
+        logger.warning("Unable to set bot commands due to Telegram API timeout: %s", exc)
+
+    webhook_runner = await start_web_server(bot=bot, config=config, session_maker=session_maker, dispatcher=dispatcher)
     sync_task = None
     if config.payment_sync_enabled:
         sync_task = asyncio.create_task(
@@ -194,7 +215,19 @@ async def run_polling() -> None:
         )
 
     try:
-        await dispatcher.start_polling(bot, drop_pending_updates=True)
+        if config.telegram_webhook_enabled:
+            await ensure_webhook(
+                bot=bot,
+                url=config.telegram_webhook_url,
+                secret_token=config.telegram_webhook_secret or None,
+            )
+            await asyncio.Event().wait()
+        else:
+            try:
+                await bot.delete_webhook(drop_pending_updates=True)
+            except TelegramNetworkError as exc:
+                logger.warning("Failed to delete webhook due to Telegram API timeout: %s", exc)
+            await dispatcher.start_polling(bot, drop_pending_updates=True)
     finally:
         if sync_task is not None:
             sync_task.cancel()

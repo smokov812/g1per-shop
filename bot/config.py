@@ -74,6 +74,10 @@ class Config:
     lzt_market_webhook_path: str
     lzt_market_strict_webhook_signature: bool
     lzt_market_lifetime_minutes: int
+    telegram_webhook_enabled: bool
+    telegram_webhook_url: str
+    telegram_webhook_path: str
+    telegram_webhook_secret: str
     web_server_enabled: bool
     web_server_host: str
     web_server_port: int
@@ -98,7 +102,7 @@ class Config:
 
 def load_config() -> Config:
     env_path = Path(__file__).resolve().parent.parent / ".env"
-    load_dotenv(dotenv_path=env_path, override=True)
+    load_dotenv(dotenv_path=env_path, override=False)
 
     bot_token = os.getenv("BOT_TOKEN", "").strip()
     admin_id_raw = os.getenv("ADMIN_ID", "").strip()
@@ -130,6 +134,8 @@ def load_config() -> Config:
     lzt_market_success_url = os.getenv("LZT_MARKET_SUCCESS_URL", "").strip()
     lzt_market_webhook_url = os.getenv("LZT_MARKET_WEBHOOK_URL", "").strip()
     order_manager_username = os.getenv("ORDER_MANAGER_USERNAME", "").strip()
+    telegram_webhook_url = os.getenv("TELEGRAM_WEBHOOK_URL", "").strip()
+    telegram_webhook_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
     payment_message = os.getenv(
         "PAYMENT_MESSAGE",
         "Оплата принимается только криптовалютой. После оформления админ пришлет реквизиты.",
@@ -178,6 +184,10 @@ def load_config() -> Config:
         lzt_market_webhook_path=os.getenv("LZT_MARKET_WEBHOOK_PATH", "/webhooks/lzt-market").strip() or "/webhooks/lzt-market",
         lzt_market_strict_webhook_signature=_env_bool("LZT_MARKET_STRICT_WEBHOOK_SIGNATURE", False),
         lzt_market_lifetime_minutes=_env_int("LZT_MARKET_LIFETIME_MINUTES", 60),
+        telegram_webhook_enabled=_env_bool("TELEGRAM_WEBHOOK_ENABLED", False),
+        telegram_webhook_url=telegram_webhook_url,
+        telegram_webhook_path=os.getenv("TELEGRAM_WEBHOOK_PATH", "/webhooks/telegram").strip() or "/webhooks/telegram",
+        telegram_webhook_secret=telegram_webhook_secret,
         web_server_enabled=_env_bool("WEB_SERVER_ENABLED", True),
         web_server_host=os.getenv("WEB_SERVER_HOST", "0.0.0.0").strip() or "0.0.0.0",
         web_server_port=_env_int("WEB_SERVER_PORT", 8080),
